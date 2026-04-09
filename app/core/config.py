@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str =""
     TRELLO_API_KEY: str = ""
     TRELLO_TOKEN: str = ""
     SMTP_HOST: str = ""

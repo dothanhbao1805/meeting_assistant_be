@@ -8,7 +8,7 @@ from app.core.security import decode_access_token
 from app.db.session import SessionLocal
 from app.models.user import User, UserRole
 from app.repositories import user_repo
-from app.services.auth_service import token_blacklist
+from app.services.WebServices.auth_service import token_blacklist
 
 bearer_scheme = HTTPBearer()
 
