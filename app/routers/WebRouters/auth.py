@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RefreshRequest, TokenResponse
-from app.services import auth_service
+from app.services.WebServices import auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer_scheme = HTTPBearer()
