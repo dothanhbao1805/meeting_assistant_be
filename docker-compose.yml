@@ -1,0 +1,83 @@
+services:
+  # ─── Auth DB ───────────────────────────────
+  db_auth:
+    image: postgres:15
+    container_name: db_auth
+    environment:
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_pass
+      POSTGRES_DB: auth_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata_auth:/var/lib/postgresql/data
+    networks:
+      - meeting_network
+
+  # ─── AI DB ─────────────────────────────────
+  db_ai:
+    image: postgres:15
+    container_name: db_ai
+    environment:
+      POSTGRES_USER: ai_user
+      POSTGRES_PASSWORD: ai_pass
+      POSTGRES_DB: ai_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata_ai:/var/lib/postgresql/data
+    networks:
+      - meeting_network
+
+  # ─── Auth Service ───────────────────────────
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://auth_user:auth_pass@db_auth:5432/auth_db
+    depends_on:
+      - db_auth
+    networks:
+      - meeting_network
+
+  # ─── AI Service ─────────────────────────────
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: ai-service
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://ai_user:ai_pass@db_ai:5432/ai_db
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - db_ai
+    networks:
+      - meeting_network
+
+  # ─── API Gateway ────────────────────────────
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth-service
+      - ai-service
+    networks:
+      - meeting_network
+
+volumes:
+  pgdata_auth:
+  pgdata_ai:
+
+networks:
+  meeting_network:
+    driver: bridge
