@@ -1,3 +1,40 @@
-.env 
-__pycache__/ 
-venv/ 
+# ─── Environment ───────────────────────────
+**/.env
+!**/.env.example
+
+# ─── Python ────────────────────────────────
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/.pytest_cache/
+**/*.egg-info/
+**/dist/
+**/build/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# ─── Virtual environments ──────────────────
+**/venv/
+**/backend_env/
+**/.venv/
+**/env/
+
+# ─── Docker ────────────────────────────────
+**/.docker/
+
+# ─── Database ──────────────────────────────
+**/*.sqlite3
+**/*.db
+
+# ─── Logs ──────────────────────────────────
+**/*.log
+**/logs/
+
+# ─── IDE / Editor ──────────────────────────
+.vscode/
+.idea/
+**/.DS_Store
+**/Thumbs.db
+
+# ─── Alembic ───────────────────────────────
+# KHÔNG ignore versions/ — cần commit migration files
