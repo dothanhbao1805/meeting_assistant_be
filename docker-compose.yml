@@ -29,6 +29,22 @@ services:
     networks:
       - meeting_network
 
+
+  db_meeting:
+    image: postgres:15
+    container_name: db_meeting
+    environment:
+      POSTGRES_USER: meeting_user
+      POSTGRES_PASSWORD: meeting_pass
+      POSTGRES_DB: meeting_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - pgdata_meeting:/var/lib/postgresql/data
+    networks:
+      - meeting_network
+
+
   # ─── Auth Service ───────────────────────────
   auth-service:
     build:
@@ -77,6 +93,7 @@ services:
 volumes:
   pgdata_auth:
   pgdata_ai:
+  pgdata_meeting:
 
 networks:
   meeting_network:
