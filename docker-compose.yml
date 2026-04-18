@@ -29,21 +29,6 @@ services:
     networks:
       - meeting_network
 
-  # # ─── Company DB ────────────────────────────
-  # db_company:
-  #   image: pgvector/pgvector:pg15
-  #   container_name: db_company
-  #   environment:
-  #     POSTGRES_USER: company_user
-  #     POSTGRES_PASSWORD: company_pass
-  #     POSTGRES_DB: company_db
-  #   ports:
-  #     - "5436:5432"
-  #   volumes:
-  #     - pgdata_company:/var/lib/postgresql/data
-  #   networks:
-  #     - meeting_network
-
   # ─── Auth Service ───────────────────────────
   auth-service:
     build:
@@ -89,26 +74,6 @@ services:
     networks:
       - meeting_network
 
-  # # ─── Company Service ─────────────────────────────
-  # company-service:
-  #   build:
-  #     context: ./services/company-service
-  #     dockerfile: Dockerfile
-  #   container_name: company-service
-  #   ports:
-  #     - "8003:8003"
-  #   environment:
-  #     COMPANY_DATABASE_URL: postgresql+asyncpg://company_user:company_pass@db_company:5432/company_db
-  #     AUTH_SERVICE_URL: http://auth-service:8001
-  #   depends_on:
-  #     - db_company
-  #     - meeting_network
-  #     - auth-service
-  #   volumes:
-  #     - ./services/company-service:/app
-  #   networks:
-  #     - meeting_network
-
   # ─── Company DB ─────────────────────────────
   db_company:
     image: pgvector/pgvector:pg15
@@ -141,10 +106,47 @@ services:
     volumes:
       - ./services/company-service:/app
 
+  # ─── Transcription DB ───────────────────────
+  db_transcription:
+    image: postgres:15
+    container_name: db_transcription
+    environment:
+      POSTGRES_USER: trans_user
+      POSTGRES_PASSWORD: trans_pass
+      POSTGRES_DB: transcription_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - pgdata_transcription:/var/lib/postgresql/data
+    networks:
+      - meeting_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trans_user -d transcription_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Transcription Service ──────────────────
+  transcription-service:
+    build:
+      context: ./services/transcription-service
+      dockerfile: Dockerfile
+    container_name: transcription-service
+    ports:
+      - "8004:8004"
+    environment:
+      TRANSCRIPTION_DATABASE_URL: postgresql+asyncpg://trans_user:trans_pass@db_transcription:5432/transcription_db
+    depends_on:
+      db_transcription:
+        condition: service_healthy
+    networks:
+      - meeting_network
+
 volumes:
   pgdata_auth:
   pgdata_ai:
   pgdata_company:
+  pgdata_transcription:    # ← thêm dòng này
 
 networks:
   meeting_network:
