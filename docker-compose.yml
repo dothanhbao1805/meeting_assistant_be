@@ -13,6 +13,11 @@ services:
       - pgdata_auth:/var/lib/postgresql/data
     networks:
       - meeting_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # ─── AI DB ─────────────────────────────────
   db_ai:
@@ -28,67 +33,11 @@ services:
       - pgdata_ai:/var/lib/postgresql/data
     networks:
       - meeting_network
-
-
-  db_meeting:
-    image: postgres:15
-    container_name: db_meeting
-    environment:
-      POSTGRES_USER: meeting_user
-      POSTGRES_PASSWORD: meeting_pass
-      POSTGRES_DB: meeting_db
-    ports:
-      - "5436:5432"
-    volumes:
-      - pgdata_meeting:/var/lib/postgresql/data
-    networks:
-      - meeting_network
-
-
-  # ─── Auth Service ───────────────────────────
-  auth-service:
-    build:
-      context: ./services/auth-service
-      dockerfile: Dockerfile
-    container_name: auth-service
-    ports:
-      - "8001:8001"
-    environment:
-      DATABASE_URL: postgresql://auth_user:auth_pass@db_auth:5432/auth_db
-    depends_on:
-      - db_auth
-    networks:
-      - meeting_network
-
-  # ─── AI Service ─────────────────────────────
-  ai-service:
-    build:
-      context: ./services/ai-service
-      dockerfile: Dockerfile
-    container_name: ai-service
-    ports:
-      - "8002:8002"
-    environment:
-      DATABASE_URL: postgresql://ai_user:ai_pass@db_ai:5432/ai_db
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-    depends_on:
-      - db_ai
-    networks:
-      - meeting_network
-
-  # ─── API Gateway ────────────────────────────
-  api-gateway:
-    build:
-      context: ./services/api-gateway
-      dockerfile: Dockerfile
-    container_name: api-gateway
-    ports:
-      - "8000:8000"
-    depends_on:
-      - auth-service
-      - ai-service
-    networks:
-      - meeting_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_user -d ai_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # ─── Company DB ─────────────────────────────
   db_company:
@@ -104,23 +53,11 @@ services:
       - pgdata_company:/var/lib/postgresql/data
     networks:
       - meeting_network
-
-  # ─── Company Service ────────────────────────
-  company-service:
-    build:
-      context: ./services/company-service
-      dockerfile: Dockerfile
-    container_name: company-service
-    ports:
-      - "8003:8003"
-    environment:
-      COMPANY_DATABASE_URL: postgresql+asyncpg://company_user:company_pass@db_company:5432/company_db
-    depends_on:
-      - db_company
-    networks:
-      - meeting_network
-    volumes:
-      - ./services/company-service:/app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U company_user -d company_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # ─── Transcription DB ───────────────────────
   db_transcription:
@@ -142,6 +79,77 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── Meeting DB ─────────────────────────────
+  db_meeting:
+    image: postgres:15
+    container_name: db_meeting
+    environment:
+      POSTGRES_USER: meeting_user
+      POSTGRES_PASSWORD: meeting_pass
+      POSTGRES_DB: meeting_db
+    ports:
+      - "5438:5432"
+    volumes:
+      - pgdata_meeting:/var/lib/postgresql/data
+    networks:
+      - meeting_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meeting_user -d meeting_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Auth Service ───────────────────────────
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://auth_user:auth_pass@db_auth:5432/auth_db
+    depends_on:
+      db_auth:
+        condition: service_healthy
+    networks:
+      - meeting_network
+
+  # ─── AI Service ─────────────────────────────
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: ai-service
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://ai_user:ai_pass@db_ai:5432/ai_db
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      db_ai:
+        condition: service_healthy
+    networks:
+      - meeting_network
+
+  # ─── Company Service ────────────────────────
+  company-service:
+    build:
+      context: ./services/company-service
+      dockerfile: Dockerfile
+    container_name: company-service
+    ports:
+      - "8003:8003"
+    environment:
+      COMPANY_DATABASE_URL: postgresql+asyncpg://company_user:company_pass@db_company:5432/company_db
+    depends_on:
+      db_company:
+        condition: service_healthy
+    networks:
+      - meeting_network
+    volumes:
+      - ./services/company-service:/app
+
   # ─── Transcription Service ──────────────────
   transcription-service:
     build:
@@ -158,13 +166,46 @@ services:
     networks:
       - meeting_network
 
+  # ─── Meeting Service ────────────────────────
+  meeting-service:
+    build:
+      context: ./services/meeting-service
+      dockerfile: Dockerfile
+    container_name: meeting-service
+    ports:
+      - "8005:8005"
+    environment:
+      MEETING_DATABASE_URL: postgresql+asyncpg://meeting_user:meeting_pass@db_meeting:5432/meeting_db
+    depends_on:
+      db_meeting:
+        condition: service_healthy
+    networks:
+      - meeting_network
+
+  # ─── API Gateway ────────────────────────────
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth-service
+      - ai-service
+      - company-service
+      - transcription-service
+      - meeting-service
+    networks:
+      - meeting_network
+
 volumes:
   pgdata_auth:
   pgdata_ai:
   pgdata_meeting:
-
   pgdata_company:
-  pgdata_transcription:    # ← thêm dòng này
+  pgdata_transcription:
 
+networks:
   meeting_network:
     driver: bridge
