@@ -14,10 +14,12 @@ class Settings(BaseSettings):
     SUPABASE_BUCKET: str = "meeting-files"
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
+    REDIS_URL: str = "redis://redis:6379"
 
     model_config = SettingsConfigDict(
         env_file=(SERVICE_ROOT / ".env", APP_DIR / ".env"),
         extra="ignore",
     )
+
 
 settings = Settings()
