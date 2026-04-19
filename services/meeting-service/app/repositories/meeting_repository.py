@@ -6,6 +6,7 @@ from app.models.meeting import Meeting
 from app.models.meeting_participant import MeetingParticipant
 from app.models.meeting_file import MeetingFile
 
+
 class MeetingRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -18,8 +19,11 @@ class MeetingRepository:
     async def add_participant(self, participant: MeetingParticipant):
         self.db.add(participant)
 
-    async def add_file(self, meeting_file: MeetingFile):
-        self.db.add(meeting_file)
+    async def add_file(self, file: MeetingFile) -> MeetingFile:
+        self.db.add(file)
+        await self.db.flush()
+        await self.db.refresh(file)
+        return file
 
     async def get_by_id(self, meeting_id: uuid.UUID) -> Meeting | None:
         result = await self.db.execute(

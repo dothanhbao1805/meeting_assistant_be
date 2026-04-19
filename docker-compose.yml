@@ -163,6 +163,8 @@ services:
     depends_on:
       db_transcription:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - meeting_network
 
@@ -178,6 +180,8 @@ services:
       MEETING_DATABASE_URL: postgresql+asyncpg://meeting_user:meeting_pass@db_meeting:5432/meeting_db
     depends_on:
       db_meeting:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - meeting_network
@@ -198,6 +202,20 @@ services:
       - meeting-service
     networks:
       - meeting_network
+
+  # ─── Redis ──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - meeting_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata_auth:

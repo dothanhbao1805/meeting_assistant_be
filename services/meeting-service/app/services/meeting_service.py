@@ -3,6 +3,8 @@ import uuid
 import asyncio
 import tempfile
 import os
+import json
+import logging
 
 from ffmpeg import FFmpeg
 from fastapi import HTTPException, UploadFile
@@ -10,9 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from storage3 import create_client as create_storage_client
 
 from app.core.config import settings
+from app.core.redis import redis_client, QUEUE_TRANSCRIPTION
 from app.models import Meeting, MeetingFile, MeetingParticipant
 from app.repositories.meeting_repository import MeetingRepository
 from app.schemas.meeting import MeetingCreate
+
+logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 45 * 1024 * 1024
 
@@ -123,7 +128,7 @@ class MeetingService:
                 MeetingParticipant(meeting_id=meeting.id, user_id=user_id)
             )
 
-        await self.repo.add_file(
+        media_file = await self.repo.add_file(
             MeetingFile(
                 meeting_id=meeting.id,
                 storage_path=public_url,
@@ -136,9 +141,25 @@ class MeetingService:
 
         await self.db.commit()
 
+        # ─── Push message vào Redis queue ───────────────────────────
+        try:
+            message = {
+                "meeting_id": str(meeting.id),
+                "media_file_id": str(media_file.id),
+                "language_code": data.language_code or "vi",
+            }
+            await redis_client.lpush(QUEUE_TRANSCRIPTION, json.dumps(message))
+            logger.info(f"Pushed transcription job to queue: meeting_id={meeting.id}")
+        except Exception as e:
+            # Không raise — meeting đã lưu thành công, queue fail không ảnh hưởng
+            logger.error(f"Push queue thất bại (meeting vẫn được lưu): {e}")
+        # ────────────────────────────────────────────────────────────
+
         created_meeting = await self.repo.get_by_id(meeting.id)
         if not created_meeting:
-            raise HTTPException(status_code=500, detail="Không tải lại được meeting sau khi tạo")
+            raise HTTPException(
+                status_code=500, detail="Không tải lại được meeting sau khi tạo"
+            )
 
         return created_meeting
 
