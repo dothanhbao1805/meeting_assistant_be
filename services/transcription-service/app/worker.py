@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import uuid
 from app.core.redis import redis_client, QUEUE_TRANSCRIPTION
 from app.db.database import AsyncSessionLocal
 from app.repositories.job_repo import TranscriptionJobRepo
@@ -12,7 +13,17 @@ async def process_message(message: dict):
     async with AsyncSessionLocal() as db:
         repo = TranscriptionJobRepo(db)
 
-        # Idempotency — kiểm tra job đã tồn tại chưa
+        # Nếu có job_id → đây là retry, không tạo job mới
+        if message.get("job_id"):
+            job = await repo.get_by_id(uuid.UUID(message["job_id"]))
+            if not job:
+                logger.error(f"Retry job không tồn tại: {message['job_id']}")
+                return
+            logger.info(f"Retry job: {job.id} — status: {job.status}")
+            # TODO: gọi Deepgram ở đây
+            return
+
+        # Không có job_id → đây là job mới, check idempotency
         existing = await repo.get_by_meeting_and_file(
             meeting_id=message["meeting_id"],
             media_file_id=message["media_file_id"],
@@ -21,7 +32,7 @@ async def process_message(message: dict):
             logger.info(f"Job đã tồn tại: {existing.id}, bỏ qua")
             return
 
-        # Tạo job mới với status queued
+        # Tạo job mới
         job = await repo.create(
             {
                 "meeting_id": message["meeting_id"],
@@ -36,15 +47,13 @@ async def process_message(message: dict):
             }
         )
         logger.info(f"Tạo job thành công: {job.id} — status: queued")
-
-        # TODO: push tiếp sang queue xử lý Deepgram
+        # TODO: gọi Deepgram ở đây
 
 
 async def run_worker():
-    logger.info("Worker started — listening queue: " + QUEUE_TRANSCRIPTION)
+    logger.info("Worker started — listening: " + QUEUE_TRANSCRIPTION)
     while True:
         try:
-            # brpop: block chờ message, timeout 5s rồi check lại
             result = await redis_client.brpop(QUEUE_TRANSCRIPTION, timeout=5)
             if result:
                 _, raw = result
