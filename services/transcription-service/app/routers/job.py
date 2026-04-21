@@ -28,3 +28,11 @@ async def get_jobs_by_meeting(
     service: TranscriptionJobService = Depends(get_job_service),
 ):
     return await service.get_jobs_by_meeting(meeting_id)
+
+
+@router.post("/{job_id}/retry", response_model=TranscriptionJobResponse)
+async def retry_job(
+    job_id: uuid.UUID,
+    service: TranscriptionJobService = Depends(get_job_service),
+):
+    return await service.retry_job(job_id)

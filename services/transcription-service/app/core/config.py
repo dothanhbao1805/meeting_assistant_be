@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     
     # Event Publishing
     REDIS_CHANNEL_TRANSCRIPTION: str = "event:transcription"
+    SUPABASE_URL: str
+    SUPABASE_SERVICE_KEY: str
+    MEETING_SERVICE_URL: str
 
     model_config = SettingsConfigDict(env_file=".env")
 
