@@ -27,6 +27,17 @@ class TranscriptionJobRepo:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_deepgram_request_id(
+        self, deepgram_request_id: str
+    ) -> TranscriptionJob | None:
+        """Tìm job theo deepgram_request_id (dùng cho webhook)"""
+        result = await self.db.execute(
+            select(TranscriptionJob).where(
+                TranscriptionJob.deepgram_request_id == deepgram_request_id
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_meeting_id(self, meeting_id: uuid.UUID) -> list[TranscriptionJob]:
         result = await self.db.execute(
             select(TranscriptionJob)
