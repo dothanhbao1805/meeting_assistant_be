@@ -156,7 +156,7 @@ async def get_utterances_paginated(
     return list(items), total
 
 
-async def get_utterance_by_id(db: AsyncSession, utterance_id: UUID) -> Optional[Utterance]:
+async def get_utterance_by_id(db: AsyncSession, utterance_id: uuid.UUID) -> Optional[Utterance]:
     stmt = select(Utterance).where(Utterance.id == utterance_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
