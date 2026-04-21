@@ -146,6 +146,7 @@ class MeetingService:
             message = {
                 "meeting_id": str(meeting.id),
                 "media_file_id": str(media_file.id),
+                "signed_url": public_url,
                 "language_code": data.language_code or "vi",
             }
             await redis_client.lpush(QUEUE_TRANSCRIPTION, json.dumps(message))
