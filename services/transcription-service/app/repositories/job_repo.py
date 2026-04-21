@@ -63,3 +63,35 @@ class TranscriptionJobRepo:
         await self.db.commit()
         await self.db.refresh(job)
         return job
+
+
+async def get_retry_count(self, job_id: uuid.UUID) -> int:
+    """Đếm số lần đã retry dựa vào error_message có prefix 'retry:'"""
+    job = await self.get_by_id(job_id)
+    if not job or not job.error_message:
+        return 0
+    retries = [
+        line for line in job.error_message.splitlines() if line.startswith("retry:")
+    ]
+    return len(retries)
+
+
+async def reset_for_retry(
+    self,
+    job_id: uuid.UUID,
+    retry_number: int,
+) -> TranscriptionJob | None:
+    job = await self.get_by_id(job_id)
+    if not job:
+        return None
+    job.status = "queued"
+    job.deepgram_request_id = None
+    job.processing_ms = None
+    job.started_at = None
+    job.completed_at = None
+    # Ghi lại lịch sử retry vào error_message
+    history = job.error_message or ""
+    job.error_message = history + f"\nretry:{retry_number}"
+    await self.db.commit()
+    await self.db.refresh(job)
+    return job
