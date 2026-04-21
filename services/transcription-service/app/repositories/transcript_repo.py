@@ -2,10 +2,11 @@ from typing import Optional, List, Tuple
 from uuid import UUID
 
 from sqlalchemy import select, update, func
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Transcript, TranscriptionJob, Utterance
+
 
 async def get_latest_done_job_with_transcript(
     db: AsyncSession,
@@ -37,7 +38,9 @@ async def get_latest_done_job_with_transcript(
     return (job, transcript)
 
 
-async def get_transcript_by_id(db: AsyncSession, transcript_id: UUID) -> Optional[Transcript]:
+async def get_transcript_by_id(
+    db: AsyncSession, transcript_id: UUID
+) -> Optional[Transcript]:
     stmt = (
         select(Transcript)
         .where(Transcript.id == transcript_id)
@@ -64,6 +67,7 @@ async def update_transcript_edited_text(
 
 
 # ─── Utterance queries ────────────────────────────────────────────────────────
+
 
 async def get_utterances_paginated(
     db: AsyncSession,
@@ -94,7 +98,9 @@ async def get_utterances_paginated(
     return list(items), total
 
 
-async def get_utterance_by_id(db: AsyncSession, utterance_id: UUID) -> Optional[Utterance]:
+async def get_utterance_by_id(
+    db: AsyncSession, utterance_id: UUID
+) -> Optional[Utterance]:
     stmt = select(Utterance).where(Utterance.id == utterance_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
