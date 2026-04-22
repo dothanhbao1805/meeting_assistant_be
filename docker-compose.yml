@@ -99,6 +99,28 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── AI Analysis DB ─────────────────────────
+  db_ai_analysis:
+    image: postgres:15
+    container_name: db_ai_analysis
+    environment:
+      POSTGRES_USER: ai_analysis_user
+      POSTGRES_PASSWORD: ai_analysis_pass
+      POSTGRES_DB: ai_analysis_db
+    ports:
+      - "5439:5432"
+    volumes:
+      - pgdata_ai_analysis:/var/lib/postgresql/data
+    networks:
+      - meeting_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_analysis_user -d ai_analysis_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+        # SERVICES
   # ─── Auth Service ───────────────────────────
   auth-service:
     build:
@@ -180,8 +202,31 @@ services:
       - "8005:8005"
     environment:
       MEETING_DATABASE_URL: postgresql+asyncpg://meeting_user:meeting_pass@db_meeting:5432/meeting_db
+      REDIS_URL: redis://redis:6379
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       db_meeting:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - meeting_network
+
+ # ─── AI Analysis Service ────────────────────
+  ai-analysis-service:
+    build:
+      context: ./services/ai-analysis-service
+      dockerfile: Dockerfile
+    container_name: ai-analysis-service
+    ports:
+      - "8006:8006"
+    environment:
+      AI_ANALYSIS_DATABASE_URL: postgresql+asyncpg://ai_analysis_user:ai_analysis_pass@db_ai_analysis:5432/ai_analysis_db
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      db_ai_analysis:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -219,12 +264,14 @@ services:
       timeout: 5s
       retries: 5
 
+
 volumes:
   pgdata_auth:
   pgdata_ai:
   pgdata_meeting:
   pgdata_company:
   pgdata_transcription:
+  pgdata_ai_analysis:
 
 networks:
   meeting_network:
