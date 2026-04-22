@@ -1,9 +1,11 @@
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from app.workers.tasks import process_transcription
 
-JOB_ID = "cc2ffff3-a034-4e19-9593-d7c6b4f7cc23"
+JOB_ID = "27a80075-8834-4210-bc48-d0af890d1b2e"
+
 
 def test_celery():
     print("🚀 Sending job to Celery...")
@@ -12,6 +14,7 @@ def test_celery():
 
     print("✅ Task ID:", task.id)
     print("📌 Status:", task.status)
+
 
 if __name__ == "__main__":
     test_celery()
