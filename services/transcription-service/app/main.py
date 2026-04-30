@@ -1,14 +1,15 @@
 import asyncio
 from fastapi import FastAPI
-from app.routers import job, webhook
+from app.routers import job, webhook, utterance
 from app.worker import run_worker
 from app.routers import transcript
-from app.routers import utterance 
+from app.routers import utterance
 
 app = FastAPI(title="Transcription Service")
 
 app.include_router(job.router, prefix="/api/v1")
 app.include_router(webhook.router, prefix="/api/v1")
+
 app.include_router(transcript.router, prefix="/api/v1")
 app.include_router(utterance.router, prefix="/api/v1")
 

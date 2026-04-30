@@ -184,6 +184,7 @@ services:
       - "8004:8004"
     environment:
       TRANSCRIPTION_DATABASE_URL: postgresql+asyncpg://trans_user:trans_pass@db_transcription:5432/transcription_db
+      REDIS_URL: redis://redis:6379 
     depends_on:
       db_transcription:
         condition: service_healthy
@@ -214,17 +215,20 @@ services:
     networks:
       - meeting_network
 
- # ─── AI Analysis Service ────────────────────
+  # ─── AI Analysis Service ────────────────────
   ai-analysis-service:
     build:
       context: ./services/ai-analysis-service
       dockerfile: Dockerfile
     container_name: ai-analysis-service
+    env_file:
+      - ./services/ai-analysis-service/.env 
     ports:
       - "8006:8006"
     environment:
       AI_ANALYSIS_DATABASE_URL: postgresql+asyncpg://ai_analysis_user:ai_analysis_pass@db_ai_analysis:5432/ai_analysis_db
       REDIS_URL: redis://redis:6379
+      TRANSCRIPTION_SERVICE_URL: http://transcription-service:8004
     depends_on:
       db_ai_analysis:
         condition: service_healthy
