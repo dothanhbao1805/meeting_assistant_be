@@ -7,3 +7,5 @@ alembic
 pydantic-settings
 python-dotenv
 redis[hiredis]
+groq
+httpx
