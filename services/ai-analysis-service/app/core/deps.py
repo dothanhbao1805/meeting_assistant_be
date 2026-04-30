@@ -19,6 +19,7 @@ class CurrentUser:
     full_name: str | None = None
     is_active: bool = True
     is_superuser: bool = False
+    
 
 
 def get_current_user(
@@ -82,3 +83,8 @@ def get_current_superuser(
             detail="Khong co quyen thuc hien thao tac nay",
         )
     return current_user
+
+def get_raw_token(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> str:
+    return credentials.credentials

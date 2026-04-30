@@ -71,3 +71,8 @@ class MeetingTranscriptResponse(BaseModel):
     job_status: str
     transcript: Optional[TranscriptResponse] = None
     message: Optional[str] = None
+    
+
+class UtteranceUpdateResolved(BaseModel):
+    speaker_label: str
+    resolved_user_id: UUID

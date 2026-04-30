@@ -9,3 +9,5 @@ python-dotenv
 redis[hiredis]
 groq
 httpx
+PyJWT
+python-multipart
