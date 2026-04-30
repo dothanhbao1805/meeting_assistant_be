@@ -7,6 +7,6 @@ alembic
 pydantic-settings
 python-dotenv
 redis[hiredis]
-celery
-requests
 httpx
+PyJWT
+python-multipart
