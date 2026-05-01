@@ -22,9 +22,7 @@ async def deepgram_webhook(
     request: Request,
     service: WebhookService = Depends(get_webhook_service),
 ):
-    """
-    Deepgram callback webhook.
-    """
+
     try:
         body = await request.body()
 

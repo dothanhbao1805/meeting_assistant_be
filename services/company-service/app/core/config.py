@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str
     CLOUDINARY_API_SECRET: str
     CLOUDINARY_SECURE: bool = True
-
+    HF_TOKEN: str
     class Config:
         env_file = ".env"
 

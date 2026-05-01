@@ -131,7 +131,7 @@ class MeetingService:
         media_file = await self.repo.add_file(
             MeetingFile(
                 meeting_id=meeting.id,
-                storage_path=public_url,
+                storage_path=storage_path,
                 storage_bucket=settings.SUPABASE_BUCKET,
                 file_type=file_ext,
                 file_size_bytes=len(content),
@@ -141,7 +141,6 @@ class MeetingService:
 
         await self.db.commit()
 
-        # ─── Push message vào Redis queue ───────────────────────────
         try:
             message = {
                 "meeting_id": str(meeting.id),
@@ -152,9 +151,7 @@ class MeetingService:
             await redis_client.lpush(QUEUE_TRANSCRIPTION, json.dumps(message))
             logger.info(f"Pushed transcription job to queue: meeting_id={meeting.id}")
         except Exception as e:
-            # Không raise — meeting đã lưu thành công, queue fail không ảnh hưởng
             logger.error(f"Push queue thất bại (meeting vẫn được lưu): {e}")
-        # ────────────────────────────────────────────────────────────
 
         created_meeting = await self.repo.get_by_id(meeting.id)
         if not created_meeting:
@@ -163,6 +160,7 @@ class MeetingService:
             )
 
         return created_meeting
+
 
     async def get_meeting(self, meeting_id: uuid.UUID) -> Meeting:
         meeting = await self.repo.get_by_id(meeting_id)

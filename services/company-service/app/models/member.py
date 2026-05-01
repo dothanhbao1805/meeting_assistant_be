@@ -46,7 +46,7 @@ class Member(Base):
     )
 
     # relationship
-    company: Mapped["Company"] = relationship(
+    company: Mapped["company"] = relationship(
         "Company",
         back_populates="members"
     )
