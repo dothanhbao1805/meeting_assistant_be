@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     MEETING_SERVICE_URL: str
 
+    COMPANY_SERVICE_URL: str
+    MEETING_SERVICE_URL: str
+    SPEAKER_SIMILARITY_THRESHOLD: float = 0.75
+
+    HF_TOKEN: Optional[str] = None
+
     model_config = SettingsConfigDict(env_file=".env")
 
 

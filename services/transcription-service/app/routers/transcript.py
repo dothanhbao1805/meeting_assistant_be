@@ -2,7 +2,7 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
@@ -18,8 +18,12 @@ from app.schemas.utterance import (
     UtteranceResolveSpeakerRequest,
     UtteranceResolveSpeakerResponse,
 )
+from app.schemas.auto_resolve import (
+    AutoResolveRequest,
+    AutoResolveResponse,
+)
 
-from app.services import transcript_service
+from app.services import transcript_service, auto_resolve_service
 
 router = APIRouter(prefix="/api/v1", tags=["Transcripts"])
 
@@ -115,3 +119,24 @@ async def resolve_speaker(
     db: AsyncSession = Depends(get_db),
 ) -> UtteranceResolveSpeakerResponse:
     return await transcript_service.resolve_speaker(db, utterance_id, payload)
+
+@router.post(
+    "/transcripts/{transcript_id}/auto-resolve-speakers",
+    response_model=AutoResolveResponse,
+    summary="Tự động nhận diện và gán người nói từ voice embeddings",
+)
+async def auto_resolve_speakers(
+    transcript_id: UUID,
+    payload: AutoResolveRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    token = request.headers.get("Authorization", "")
+    return await auto_resolve_service.auto_resolve_speakers(
+        db,
+        transcript_id,
+        str(payload.meeting_id),
+        str(payload.company_id),
+        str(payload.meeting_file_id),
+        token = token,
+    )

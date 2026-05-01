@@ -160,8 +160,15 @@ services:
     container_name: transcription-service
     ports:
       - "8004:8004"
+    env_file:
+      - ./services/transcription-service/.env
     environment:
       TRANSCRIPTION_DATABASE_URL: postgresql+asyncpg://trans_user:trans_pass@db_transcription:5432/transcription_db
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      MEETING_SERVICE_URL: http://meeting-service:8005/api/v1
+      COMPANY_SERVICE_URL: http://company-service:8003/api/v1
+      SPEAKER_SIMILARITY_THRESHOLD: "0.5"
     depends_on:
       db_transcription:
         condition: service_healthy

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.models import TranscriptionJob, Transcript, Utterance
 
-DATABASE_URL = "postgresql+asyncpg://trans_user:trans_pass@localhost:5437/transcription_db"
+DATABASE_URL = "postgresql+asyncpg://trans_user:trans_pass@db_transcription:5432/transcription_db"
 
 engine = create_async_engine(DATABASE_URL)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

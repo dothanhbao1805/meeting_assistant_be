@@ -15,3 +15,9 @@ psycopg2-binary==2.9.11
 httpx==0.28.1
 pgvector==0.4.2
 cloudinary==1.44.1
+
+# ===== AI stack =====
+numpy==1.26.4
+soundfile==0.12.1
+pyannote.audio==3.3.2
+huggingface_hub==0.19.4
