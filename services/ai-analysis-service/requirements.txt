@@ -7,11 +7,7 @@ alembic
 pydantic-settings
 python-dotenv
 redis[hiredis]
-celery
-requests
-
-pyannote.audio==3.3.2
-numpy==1.26.4
-soundfile==0.12.1
-httpx==0.27.0
-huggingface_hub==0.19.4
+groq
+httpx
+PyJWT
+python-multipart
