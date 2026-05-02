@@ -32,4 +32,4 @@ class UtteranceService:
         )
 
     async def get_utterances_by_transcript_id(self, transcript_id: uuid.UUID) -> list:
-        return await self.repo.get_by_transcript_id(transcript_id)
+        return await self.utterance_repository.get_by_transcript_id(transcript_id)

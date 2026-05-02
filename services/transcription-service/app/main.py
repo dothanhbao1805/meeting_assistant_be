@@ -10,7 +10,7 @@ app = FastAPI(title="Transcription Service")
 app.include_router(job.router, prefix="/api/v1")
 app.include_router(webhook.router, prefix="/api/v1")
 
-app.include_router(transcript.router, prefix="/api/v1")
+app.include_router(transcript.router)
 app.include_router(utterance.router, prefix="/api/v1")
 
 

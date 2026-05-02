@@ -9,6 +9,9 @@ class Settings(BaseSettings):
 
     MEETING_SERVICE_URL: str = "http://meeting-service:8005/api/v1"
     TRANSCRIPTION_SERVICE_URL: str = "http://transcription-service:8004/api/v1"
+    COMPANY_SERVICE_URL: str = "http://company-service:8003"
+    INTERNAL_SERVICE_KEY: str = "super-secret-internal-key-2026"
+    AUTH_SERVICE_URL: str = "http://auth-service:8001"
 
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"

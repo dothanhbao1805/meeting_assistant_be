@@ -1,20 +1,20 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from app.core.redis import redis_client, QUEUE_ANALYSIS
 from app.db.database import AsyncSessionLocal
-from app.core.config import settings
 from app.repositories.job_repo import AnalysisJobRepo
 from app.repositories.summary_repo import MeetingSummaryRepo
 from app.repositories.task_repo import ExtractedTaskRepo
 from app.services.groq_service import analyze_meeting
 from app.services.utterance_client import fetch_utterances
+from app.services.participant_client import fetch_participants
+from app.services.assignee_mapper import map_assignees
+from app.services.deadline_parser import parse_deadline
 
 logger = logging.getLogger(__name__)
-
-CHANNEL_ANALYSIS_COMPLETED = "analysis.completed"
 
 
 async def process_message(message: dict):
@@ -23,114 +23,63 @@ async def process_message(message: dict):
         summary_repo = MeetingSummaryRepo(db)
         task_repo = ExtractedTaskRepo(db)
 
-        # ── 1. Lấy job từ DB ──────────────────────────────────────────────
-        job_id = message.get("job_id")
-        logger.info(f"[WORKER] Bắt đầu xử lý message: {message}")
-
-        job = await job_repo.get_by_id(job_id)
+        job = await job_repo.get_by_id(message["job_id"])
         if not job:
-            logger.error(f"[WORKER] Job không tồn tại: {job_id}")
+            logger.error(f"Job không tồn tại: {message['job_id']}")
             return
 
-        logger.info(f"[WORKER] Job {job.id} — status hiện tại: {job.status}")
-
-        # Guard: tránh xử lý lại job đã done hoặc đang processing
-        if job.status in ("processing", "done"):
-            logger.warning(
-                f"[WORKER] Job {job.id} đã ở trạng thái {job.status}, bỏ qua"
-            )
-            return
-
-        # ── 2. Cập nhật status → processing ──────────────────────────────
-        await job_repo.update(
-            job,
-            status="processing",
-            started_at=datetime.now(timezone.utc),
-        )
-        logger.info(f"[WORKER] Job {job.id} → processing")
+        await job_repo.update(job, status="processing", started_at=datetime.now(timezone.utc))
 
         try:
-            # ── 3. Fetch utterances ───────────────────────────────────────
-            logger.info(
-                f"[WORKER] Job {job.id} — fetch_utterances(transcript_id={job.transcript_id})"
-            )
-            try:
-                utterances = await fetch_utterances(str(job.transcript_id))
-            except Exception as e:
-                raise RuntimeError(f"[fetch_utterances] {type(e).__name__}: {e}") from e
-
+            # 1. Lấy utterances từ Transcription Service
+            utterances = await fetch_utterances(str(job.transcript_id))
             if not utterances:
-                raise ValueError(
-                    f"Không có utterances cho transcript {job.transcript_id}"
-                )
+                raise ValueError("Không có utterances để phân tích")
 
-            logger.info(
-                f"[WORKER] Job {job.id} — lấy được {len(utterances)} utterances"
+            # 2. Lấy participants (user_id + full_name) từ Meeting + Company Service
+            participants = await fetch_participants(str(job.meeting_id))
+            logger.info(f"[DEBUG] Participants ({len(participants)}): {participants}")
+
+            # 3. Gọi Groq song song: summary + task extraction
+            summary_data, tasks_data, input_tokens, output_tokens = await analyze_meeting(
+                utterances=utterances,
+                model=job.ai_model,
+                participants=participants,
             )
+            logger.info(f"[DEBUG] Tasks từ Groq: {json.dumps(tasks_data, ensure_ascii=False)}")
 
-            # ── 4. Gọi Groq ───────────────────────────────────────────────
-            logger.info(
-                f"[WORKER] Job {job.id} — gọi analyze_meeting("
-                f"model={job.ai_model or settings.GROQ_MODEL}, "
-                f"utterances_count={len(utterances)})"
-            )
-            try:
-                (
-                    summary_data,
-                    tasks_data,
-                    input_tokens,
-                    output_tokens,
-                ) = await analyze_meeting(
-                    utterances=utterances,
-                    model=job.ai_model or settings.GROQ_MODEL,
-                )
-            except Exception as e:
-                raise RuntimeError(f"[analyze_meeting] {type(e).__name__}: {e}") from e
+            # 4. AI tự map assignee_name → resolved_user_id
+            tasks_data = map_assignees(tasks_data, participants)
+            logger.info(f"[DEBUG] Tasks sau map: {[(t['title'], t.get('raw_assignee_text'), t.get('resolved_user_id')) for t in tasks_data]}")
 
-            logger.info(
-                f"[WORKER] Job {job.id} — Groq OK: "
-                f"{len(tasks_data)} tasks, tokens in={input_tokens} out={output_tokens}"
-            )
+            # 5. Parse deadline_raw → deadline_date
+            ref_date = date.today()
+            for task in tasks_data:
+                task["deadline_date"] = parse_deadline(task.get("deadline_raw"), ref_date)
 
-            # ── 5a. Lưu summary ───────────────────────────────────────────
-            logger.info(f"[WORKER] Job {job.id} — lưu summary...")
-            try:
-                await summary_repo.create(
-                    {
-                        "analysis_job_id": job.id,
-                        "meeting_id": job.meeting_id,
-                        **summary_data,
-                    }
-                )
-            except Exception as e:
-                raise RuntimeError(
-                    f"[summary_repo.create] {type(e).__name__}: {e}"
-                ) from e
-            logger.info(f"[WORKER] Job {job.id} — đã lưu summary")
+            # Log kết quả map
+            for t in tasks_data:
+                status = "✅" if t.get("resolved_user_id") else "⚠️ cần user gán"
+                logger.info(f"{status} Task: {t['title']} | assignee: {t.get('raw_assignee_text')} → {t.get('resolved_user_id')}")
 
-            # ── 5b. Lưu tasks ─────────────────────────────────────────────
-            if tasks_data:
-                logger.info(f"[WORKER] Job {job.id} — lưu {len(tasks_data)} tasks...")
-                try:
-                    await task_repo.bulk_create(
-                        [
-                            {
-                                "analysis_job_id": job.id,
-                                "meeting_id": job.meeting_id,
-                                **task,
-                            }
-                            for task in tasks_data
-                        ]
-                    )
-                except Exception as e:
-                    raise RuntimeError(
-                        f"[task_repo.bulk_create] {type(e).__name__}: {e}"
-                    ) from e
-                logger.info(f"[WORKER] Job {job.id} — đã lưu {len(tasks_data)} tasks")
-            else:
-                logger.info(f"[WORKER] Job {job.id} — không có task nào")
+            # 6. Lưu summary
+            await summary_repo.create({
+                "analysis_job_id": job.id,
+                "meeting_id": job.meeting_id,
+                **summary_data,
+            })
 
-            # ── 6. Cập nhật job → done ────────────────────────────────────
+            # 7. Lưu tasks
+            await task_repo.bulk_create([
+                {
+                    "analysis_job_id": job.id,
+                    "meeting_id": job.meeting_id,
+                    **task,
+                }
+                for task in tasks_data
+            ])
+
+            # 8. Cập nhật job → done
             await job_repo.update(
                 job,
                 status="done",
@@ -138,53 +87,29 @@ async def process_message(message: dict):
                 output_tokens=output_tokens,
                 completed_at=datetime.now(timezone.utc),
             )
-            logger.info(f"[WORKER] Job {job.id} → done ✓")
 
-            # ── 7. Publish event ───────────────────────────────────────────
-            event_payload = {
-                "event": "analysis.completed",
-                "job_id": str(job.id),
-                "meeting_id": str(job.meeting_id),
-                "transcript_id": str(job.transcript_id),
-                "task_count": len(tasks_data),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-            try:
-                await redis_client.publish(
-                    CHANNEL_ANALYSIS_COMPLETED,
-                    json.dumps(event_payload),
-                )
-            except Exception as e:
-                # Không fail job chỉ vì publish lỗi
-                logger.warning(f"[WORKER] Job {job.id} — publish event thất bại: {e}")
-
-            logger.info(f"[WORKER] Published analysis.completed event cho job {job.id}")
+            mapped = sum(1 for t in tasks_data if t.get("resolved_user_id"))
+            logger.info(
+                f"Job {job.id} hoàn thành — "
+                f"{len(tasks_data)} tasks, "
+                f"{mapped} mapped, "
+                f"{len(tasks_data) - mapped} cần user review"
+            )
 
         except Exception as e:
-            logger.error(
-                f"[WORKER] Job {job.id} FAILED ở bước: {e}",
-                exc_info=True,  # In full traceback
-            )
-            await job_repo.update(
-                job,
-                status="failed",
-                error_message=str(e),
-            )
+            logger.error(f"Job {job.id} thất bại: {e}")
+            await job_repo.update(job, status="failed", error_message=str(e))
 
 
 async def run_worker():
-    logger.info(f"[WORKER] AI Analysis Worker started — listening: {QUEUE_ANALYSIS}")
+    logger.info("AI Analysis Worker started — listening: " + QUEUE_ANALYSIS)
     while True:
         try:
             result = await redis_client.brpop(QUEUE_ANALYSIS, timeout=5)
             if result:
                 _, raw = result
-                logger.debug(f"[WORKER] Raw message nhận được: {raw}")
                 message = json.loads(raw)
-                logger.info(f"[WORKER] Dequeue message: {message}")
                 await process_message(message)
         except Exception as e:
-            logger.error(
-                f"[WORKER] Worker loop error: {type(e).__name__}: {e}", exc_info=True
-            )
+            logger.error(f"Worker error: {e}")
             await asyncio.sleep(2)
