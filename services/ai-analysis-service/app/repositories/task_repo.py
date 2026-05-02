@@ -105,3 +105,18 @@ class ExtractedTaskRepo:
         result = await self.db.execute(stmt)
         await self.db.commit()
         return result.rowcount
+
+    async def update_task(self, task_id: uuid.UUID, data: dict) -> ExtractedTask | None:
+        stmt = (
+            update(ExtractedTask)
+            .where(ExtractedTask.id == task_id)
+            .values(**data)
+            .returning(ExtractedTask)
+        )
+
+        result = await self.db.execute(stmt)
+        await self.db.commit()
+        return result.scalar_one_or_none()
+
+
+TaskRepo = ExtractedTaskRepo

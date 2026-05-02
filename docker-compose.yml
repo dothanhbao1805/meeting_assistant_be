@@ -119,6 +119,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── Integration DB ─────────────────────────
+  db_integration:
+    image: postgres:15
+    container_name: db_integration
+    environment:
+      POSTGRES_USER: integration_user
+      POSTGRES_PASSWORD: integration_pass
+      POSTGRES_DB: integration_db
+    ports:
+      - "5440:5432"
+    volumes:
+      - pgdata_integration:/var/lib/postgresql/data
+    networks:
+      - meeting_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U integration_user -d integration_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
         # SERVICES
   # ─── Auth Service ───────────────────────────
@@ -244,6 +263,25 @@ services:
     networks:
       - meeting_network
 
+ # ─── Integration Service ────────────────────
+  integration-service:
+    build:
+      context: ./services/integration-service
+      dockerfile: Dockerfile
+    container_name: integration-service
+    ports:
+      - "8007:8007"
+    environment:
+      INTEGRATION_DATABASE_URL: postgresql+asyncpg://integration_user:integration_pass@db_integration:5432/integration_db
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      db_integration:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - meeting_network
+
   # ─── API Gateway ────────────────────────────
   api-gateway:
     build:
@@ -283,6 +321,7 @@ volumes:
   pgdata_company:
   pgdata_transcription:
   pgdata_ai_analysis:
+  pgdata_integration:
 
 networks:
   meeting_network:
