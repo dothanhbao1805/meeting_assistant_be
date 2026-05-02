@@ -24,3 +24,12 @@ async def get_all_users(db: AsyncSession) -> list[User]:
 
 async def delete_user(db: AsyncSession, user_id: str) -> None:
     await user_repo.delete_user(db, user_id)
+
+async def get_user_by_id(db: AsyncSession, user_id: str) -> User:
+    user = await user_repo.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User không tồn tại",
+        )
+    return user

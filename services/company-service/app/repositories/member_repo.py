@@ -38,3 +38,9 @@ async def delete_member(db: AsyncSession, member_id: str) -> None:
     if member:
         await db.delete(member)
         await db.commit()
+
+async def get_by_account_id(db: AsyncSession, account_id: str):
+    result = await db.execute(
+        select(Member).where(Member.id == account_id)  # đổi account_id → id
+    )
+    return result.scalar_one_or_none()

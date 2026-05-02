@@ -227,12 +227,11 @@ services:
     container_name: meeting-service
     ports:
       - "8005:8005"
+    env_file:
+      - ./services/meeting-service/.env
     environment:
       MEETING_DATABASE_URL: postgresql+asyncpg://meeting_user:meeting_pass@db_meeting:5432/meeting_db
       REDIS_URL: redis://redis:6379
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
-      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       db_meeting:
         condition: service_healthy
@@ -255,6 +254,8 @@ services:
       AI_ANALYSIS_DATABASE_URL: postgresql+asyncpg://ai_analysis_user:ai_analysis_pass@db_ai_analysis:5432/ai_analysis_db
       REDIS_URL: redis://redis:6379
       TRANSCRIPTION_SERVICE_URL: http://transcription-service:8004
+      COMPANY_SERVICE_URL: http://company-service:8003
+      MEETING_SERVICE_URL: http://meeting-service:8005
     depends_on:
       db_ai_analysis:
         condition: service_healthy

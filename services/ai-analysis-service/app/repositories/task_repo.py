@@ -1,3 +1,4 @@
+from asyncio import tasks
 import uuid
 from datetime import datetime, timezone
 from typing import List
@@ -21,13 +22,15 @@ class ExtractedTaskRepo:
                 title=t["title"],
                 description=t.get("description"),
                 raw_assignee_text=t.get("raw_assignee_text"),
+                resolved_user_id=t.get("resolved_user_id"),  # thêm
                 deadline_raw=t.get("deadline_raw"),
+                deadline_date=t.get("deadline_date"),          # thêm
                 priority=t.get("priority", "medium"),
                 status="pending",
                 ai_confidence=t.get("ai_confidence"),
                 created_at=datetime.now(timezone.utc),
             )
-            for t in tasks
+                for t in tasks
         ]
         self.db.add_all(objects)
         await self.db.commit()

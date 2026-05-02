@@ -10,11 +10,21 @@ logger = logging.getLogger(__name__)
 client = AsyncGroq(api_key=settings.GROQ_API_KEY)
 
 
-def _build_conversation(utterances: list[dict]) -> str:
-    """Chuyển utterances thành đoạn hội thoại dạng text."""
+def _build_conversation(utterances: list[dict], participants: list[dict] | None = None) -> str:
+    user_map = {}
+    if participants:
+        for p in participants:
+            user_map[str(p["user_id"])] = p["full_name"]
+
     lines = []
     for u in utterances:
-        speaker = u.get("resolved_name") or u.get("speaker_label") or "Unknown"
+        resolved_user_id = str(u.get("resolved_user_id") or "")
+
+        if resolved_user_id and resolved_user_id in user_map:
+            speaker = user_map[resolved_user_id]
+        else:
+            speaker = u.get("speaker_label") or "Unknown"
+
         text = u.get("text", "").strip()
         start = u.get("start_time_ms", 0) // 1000
         lines.append(f"[{start}s] {speaker}: {text}")
@@ -22,18 +32,11 @@ def _build_conversation(utterances: list[dict]) -> str:
 
 
 def _parse_json(content: str | None, label: str) -> any:
-    """
-    Parse JSON từ response Groq.
-    Xử lý các trường hợp:
-    - Content rỗng / None
-    - Model wrap JSON trong markdown fence: ```json ... ```
-    """
     if not content or not content.strip():
         raise ValueError(f"[{label}] Groq trả về content rỗng")
 
     logger.debug(f"[{label}] Raw content: {repr(content[:300])}")
 
-    # Strip markdown code fence nếu có
     cleaned = content.strip()
     cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
     cleaned = re.sub(r"\s*```$", "", cleaned).strip()
@@ -74,7 +77,7 @@ TASK_PROMPT = """Bạn là trợ lý trích xuất công việc từ cuộc họ
 ]
 
 Chỉ trả về JSON array, không giải thích thêm.
-
+{participant_hint}
 Nội dung cuộc họp:
 {conversation}"""
 
@@ -82,24 +85,39 @@ Nội dung cuộc họp:
 async def analyze_meeting(
     utterances: list[dict],
     model: str,
+    participants: list[dict] | None = None,
 ) -> tuple[dict, list[dict], int, int]:
-    """
-    Gọi song song Groq 2 lần: summary + task extraction.
-    Trả về (summary_data, tasks_data, total_input_tokens, total_output_tokens)
-    """
-    conversation = _build_conversation(utterances)
+    conversation = _build_conversation(utterances, participants)
     logger.info(
         f"[groq_service] Conversation length: {len(conversation)} chars, {len(utterances)} utterances"
     )
+
+    # Build participant hint cho task prompt
+    if participants:
+        names = ", ".join([p["full_name"] for p in participants if p.get("full_name")])
+        participant_hint = (
+            f"\nDanh sách người tham gia cuộc họp: {names}."
+            f"\nKhi xác định assignee, hãy dùng ĐÚNG tên trong danh sách trên."
+            f"\nNếu không rõ người được giao, để null.\n"
+        )
+        logger.info(f"[groq_service] Participants hint: {names}")
+    else:
+        participant_hint = ""
+        logger.warning("[groq_service] Không có participants — Groq sẽ tự đoán assignee")
 
     summary_msg = [
         {"role": "user", "content": SUMMARY_PROMPT.format(conversation=conversation)}
     ]
     task_msg = [
-        {"role": "user", "content": TASK_PROMPT.format(conversation=conversation)}
+        {
+            "role": "user",
+            "content": TASK_PROMPT.format(
+                conversation=conversation,
+                participant_hint=participant_hint,
+            ),
+        }
     ]
 
-    # Gọi song song
     summary_resp, task_resp = await asyncio.gather(
         client.chat.completions.create(model=model, messages=summary_msg),
         client.chat.completions.create(model=model, messages=task_msg),
@@ -108,31 +126,21 @@ async def analyze_meeting(
     summary_content = summary_resp.choices[0].message.content
     task_content = task_resp.choices[0].message.content
 
-    logger.info(
-        f"[groq_service] summary finish_reason={summary_resp.choices[0].finish_reason}"
-    )
-    logger.info(
-        f"[groq_service] task finish_reason={task_resp.choices[0].finish_reason}"
-    )
+    logger.info(f"[groq_service] summary finish_reason={summary_resp.choices[0].finish_reason}")
+    logger.info(f"[groq_service] task finish_reason={task_resp.choices[0].finish_reason}")
 
     summary_data = _parse_json(summary_content, "summary")
     tasks_data = _parse_json(task_content, "tasks")
 
-    # Đảm bảo tasks_data luôn là list
     if not isinstance(tasks_data, list):
-        logger.warning(
-            f"[groq_service] tasks_data không phải list, nhận được: {type(tasks_data)}"
-        )
+        logger.warning(f"[groq_service] tasks_data không phải list: {type(tasks_data)}")
         tasks_data = []
 
     input_tokens = summary_resp.usage.prompt_tokens + task_resp.usage.prompt_tokens
-    output_tokens = (
-        summary_resp.usage.completion_tokens + task_resp.usage.completion_tokens
-    )
+    output_tokens = summary_resp.usage.completion_tokens + task_resp.usage.completion_tokens
 
     logger.info(
-        f"[groq_service] Done — tokens in={input_tokens} out={output_tokens}, "
-        f"tasks={len(tasks_data)}"
+        f"[groq_service] Done — tokens in={input_tokens} out={output_tokens}, tasks={len(tasks_data)}"
     )
 
     return summary_data, tasks_data, input_tokens, output_tokens

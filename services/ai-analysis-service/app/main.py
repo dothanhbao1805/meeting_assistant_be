@@ -1,11 +1,17 @@
 import asyncio
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 from fastapi import FastAPI
 from app.routers import job
 from app.routers.analysis import router as analysis_router
 from app.routers.health import router as health_router
 from app.worker import run_worker
 from app.subscribers.transcription_subscriber import start_subscriber
-
 from app.routers import speaker
 from app.routers import task
 
