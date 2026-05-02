@@ -27,6 +27,7 @@ class Company(Base):
 
     logo_url: Mapped[Optional[str]] = mapped_column(Text)
     trello_token: Mapped[Optional[str]] = mapped_column(Text)
+    trello_api_key: Mapped[Optional[str]] = mapped_column(Text)
     trello_workspace_id: Mapped[Optional[str]] = mapped_column(String(100))
 
     owner_account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
@@ -35,13 +36,9 @@ class Company(Base):
         Enum(CompanyStatus), default=CompanyStatus.active
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # relationship
     members: Mapped[List["Member"]] = relationship(
-        "Member",
-        back_populates="company",
-        cascade="all, delete-orphan"
+        "Member", back_populates="company", cascade="all, delete-orphan"
     )
