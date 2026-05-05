@@ -59,11 +59,26 @@ class ExtractedTaskRepo:
         await self.db.refresh(task)
         return task
 
-    async def get_tasks_by_meeting(self, meeting_id: uuid.UUID) -> list[ExtractedTask]:
-        result = await self.db.execute(
-            select(ExtractedTask).where(ExtractedTask.meeting_id == meeting_id)
-        )
+    async def get_tasks_by_meeting(
+        self,
+        meeting_id: uuid.UUID,
+        status: str | None = None,
+        resolved_user_id: uuid.UUID | None = None,
+    ) -> list[ExtractedTask]:
+        query = select(ExtractedTask).where(ExtractedTask.meeting_id == meeting_id)
+        if status:
+            query = query.where(ExtractedTask.status == status)
+        if resolved_user_id:
+            query = query.where(ExtractedTask.resolved_user_id == resolved_user_id)
+        
+        result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def get_by_id(self, task_id: uuid.UUID) -> ExtractedTask | None:
+        result = await self.db.execute(
+            select(ExtractedTask).where(ExtractedTask.id == task_id)
+        )
+        return result.scalar_one_or_none()
 
     async def get_confirmed_tasks_by_meeting(
         self, meeting_id: uuid.UUID
