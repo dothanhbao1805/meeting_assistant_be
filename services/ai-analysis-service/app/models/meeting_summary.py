@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, TIMESTAMP
+from sqlalchemy import Column, String, Text, ForeignKey, TIMESTAMP, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.db.database import Base
@@ -15,6 +15,7 @@ class MeetingSummary(Base):
     meeting_id = Column(UUID(as_uuid=True), nullable=False)
     summary_text = Column(Text, nullable=True)
     edited_summary = Column(Text, nullable=True)
+    is_edited = Column(Boolean, default=False)
     key_decisions = Column(JSONB, nullable=True)
     attendees_mentioned = Column(JSONB, nullable=True)
     topics_covered = Column(JSONB, nullable=True)

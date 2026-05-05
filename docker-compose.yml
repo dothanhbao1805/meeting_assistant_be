@@ -183,6 +183,8 @@ services:
     container_name: company-service
     ports:
       - "8003:8003"
+    env_file:
+      - ./services/company-service/.env
     environment:
       COMPANY_DATABASE_URL: postgresql+asyncpg://company_user:company_pass@db_company:5432/company_db
     depends_on:

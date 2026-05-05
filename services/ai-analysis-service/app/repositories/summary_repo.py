@@ -1,5 +1,7 @@
+import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
 from app.models.meeting_summary import MeetingSummary
 
 
@@ -22,3 +24,26 @@ class MeetingSummaryRepo:
         await self.db.commit()
         await self.db.refresh(summary)
         return summary
+
+    async def get_by_meeting_id(self, meeting_id: uuid.UUID) -> MeetingSummary | None:
+        result = await self.db.execute(
+            select(MeetingSummary).where(MeetingSummary.meeting_id == meeting_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_id(self, summary_id: uuid.UUID) -> MeetingSummary | None:
+        result = await self.db.execute(
+            select(MeetingSummary).where(MeetingSummary.id == summary_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def update(self, summary_id: uuid.UUID, data: dict) -> MeetingSummary | None:
+        stmt = (
+            update(MeetingSummary)
+            .where(MeetingSummary.id == summary_id)
+            .values(**data)
+            .returning(MeetingSummary)
+        )
+        result = await self.db.execute(stmt)
+        await self.db.commit()
+        return result.scalar_one_or_none()
