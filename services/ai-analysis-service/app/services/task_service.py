@@ -56,6 +56,7 @@ class TaskService:
             }
 
         confirmed_count = await self.repo.confirm_tasks(valid_task_ids)
+        await self._publish_confirmed_tasks(meeting_id)
 
         return {
             "confirmed_count": confirmed_count,
@@ -64,6 +65,9 @@ class TaskService:
         }
 
     async def sync_to_integration(self, meeting_id: uuid.UUID):
+        return await self._publish_confirmed_tasks(meeting_id)
+
+    async def _publish_confirmed_tasks(self, meeting_id: uuid.UUID):
         # 1. Lấy confirmed tasks
         tasks = await self.repo.get_confirmed_tasks_by_meeting(meeting_id)
         if not tasks:
@@ -77,7 +81,7 @@ class TaskService:
         async with httpx.AsyncClient() as client:
             try:
                 resp = await client.get(
-                    f"{settings.MEETING_SERVICE_URL}/meetings/{meeting_id}",
+                    f"{settings.MEETING_SERVICE_URL}/internal/meetings/{meeting_id}",
                     timeout=10,
                 )
                 resp.raise_for_status()

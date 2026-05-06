@@ -13,9 +13,33 @@ from app.services.utterance_client import fetch_utterances
 from app.services.participant_client import fetch_participants
 from app.services.assignee_mapper import map_assignees
 from app.services.deadline_parser import parse_deadline
+from app.services.event_publisher import publish_analysis_completed
 
 logger = logging.getLogger(__name__)
 
+
+# deadline_normalizer.py
+WORD_TO_NUM = {
+    "một": 1, "hai": 2, "ba": 3, "bốn": 4, "năm": 5,
+    "sáu": 6, "bảy": 7, "tám": 8, "chín": 9, "mười": 10,
+}
+
+FILLER_WORDS = ["vòng", "khoảng", "trong", "tầm", "chừng", "khoảng chừng"]
+
+def normalize_deadline(text: str) -> str:
+    if not text:
+        return text
+    result = text.lower().strip()
+    
+    # Xóa từ ước lượng
+    for word in FILLER_WORDS:
+        result = result.replace(word, "").strip()
+    
+    # Chuyển số chữ → số
+    for word, num in WORD_TO_NUM.items():
+        result = result.replace(word, str(num))
+    
+    return result.strip()
 
 async def process_message(message: dict):
     async with AsyncSessionLocal() as db:
@@ -55,7 +79,9 @@ async def process_message(message: dict):
             # 5. Parse deadline_raw → deadline_date
             ref_date = date.today()
             for task in tasks_data:
-                task["deadline_date"] = parse_deadline(task.get("deadline_raw"), ref_date)
+                raw = task.get("deadline_raw")
+                normalized = normalize_deadline(raw)          
+                task["deadline_date"] = parse_deadline(normalized, ref_date)
 
             # Log kết quả map
             for t in tasks_data:
@@ -63,14 +89,14 @@ async def process_message(message: dict):
                 logger.info(f"{status} Task: {t['title']} | assignee: {t.get('raw_assignee_text')} → {t.get('resolved_user_id')}")
 
             # 6. Lưu summary
-            await summary_repo.create({
+            summary = await summary_repo.create({
                 "analysis_job_id": job.id,
                 "meeting_id": job.meeting_id,
                 **summary_data,
             })
 
             # 7. Lưu tasks
-            await task_repo.bulk_create([
+            created_tasks = await task_repo.bulk_create([
                 {
                     "analysis_job_id": job.id,
                     "meeting_id": job.meeting_id,
@@ -89,6 +115,15 @@ async def process_message(message: dict):
             )
 
             mapped = sum(1 for t in tasks_data if t.get("resolved_user_id"))
+            await publish_analysis_completed(
+                analysis_job_id=job.id,
+                meeting_id=job.meeting_id,
+                transcript_id=job.transcript_id,
+                summary_id=summary.id,
+                extracted_task_count=len(created_tasks),
+                mapped_task_count=mapped,
+            )
+
             logger.info(
                 f"Job {job.id} hoàn thành — "
                 f"{len(tasks_data)} tasks, "

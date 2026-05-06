@@ -44,6 +44,9 @@ async def create_meeting(
     company_id: UUID = Form(...),
     scheduled_at: Optional[str] = Form(None),
     language_code: Optional[str] = Form("vi"),
+    trello_board_id: Optional[str] = Form(None),
+    trello_board_name: Optional[str] = Form(None),
+    trello_list_id: Optional[str] = Form(None),
     participant_user_ids: Optional[str] = Form("[]"),
     file: UploadFile = File(...),
     service: MeetingService = Depends(get_meeting_service),
@@ -56,6 +59,9 @@ async def create_meeting(
         company_id=company_id,
         scheduled_at=datetime.fromisoformat(scheduled_at) if scheduled_at else None,
         language_code=language_code,
+        trello_board_id=trello_board_id,
+        trello_board_name=trello_board_name,
+        trello_list_id=trello_list_id,
         participant_user_ids=participants,
     )
 

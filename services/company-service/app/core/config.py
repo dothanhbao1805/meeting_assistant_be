@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str
     CLOUDINARY_SECURE: bool = True
     HF_TOKEN: str
+    API_BASE_URL: str = "http://company-service:8003/api/v1"
+
     class Config:
         env_file = ".env"
 

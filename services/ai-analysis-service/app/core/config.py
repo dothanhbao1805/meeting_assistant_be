@@ -18,9 +18,6 @@ class Settings(BaseSettings):
 
     GROQ_API_KEY: str
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
-
-    TRANSCRIPTION_SERVICE_URL: str = "http://transcription-service:8004"
-
     class Config:
         env_file = ".env"  # dùng khi chạy local
         env_file_encoding = "utf-8"
