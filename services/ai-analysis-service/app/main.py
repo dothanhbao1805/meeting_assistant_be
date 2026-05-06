@@ -10,11 +10,13 @@ from app.worker import run_worker
 from app.subscribers.transcription_subscriber import start_subscriber
 from app.routers import speaker
 from app.routers import task
+from app.routers import summary
 
 app = FastAPI(title="AI Analysis Service")
 app.include_router(job.router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(summary.router, prefix="/api/v1")
 
 
 @app.on_event("startup")
