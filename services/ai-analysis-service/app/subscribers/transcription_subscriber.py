@@ -7,7 +7,6 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 CHANNEL_AUTO_RESOLVE_COMPLETED = "event:auto_resolve.completed"
-SELF_BASE_URL = settings.SELF_BASE_URL
 
 
 async def start_subscriber():

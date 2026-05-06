@@ -18,7 +18,7 @@ class SpeakerService:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 # 1. Lấy meeting (participants)
                 p_resp = await client.get(
-                    f"{self.meeting_url}/meetings/{meeting_id}",
+                    f"{self.meeting_url}/internal/meetings/{meeting_id}",
                     headers=headers,
                 )
 

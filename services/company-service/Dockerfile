@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cpu \
     torch==2.3.1 torchaudio==2.3.1
 
-RUN pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
+RUN pip install --no-cache-dir --default-timeout=2000 -r requirements.txt
 
 COPY . .
 

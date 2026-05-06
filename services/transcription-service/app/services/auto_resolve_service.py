@@ -42,7 +42,7 @@ async def _get_audio_url(meeting_file_id: str, token: str) -> str:
     data = resp.json()
     bucket = data["storage_bucket"]
     path = data["storage_path"]
-    audio_url = f"{SUPABASE_URL}/storage/v1/object/{bucket}/{path}"
+    audio_url = f"{SUPABASE_URL}/storage/v1/object/authenticated/{bucket}/{path}"
     logger.info("Built audio URL", extra={"audio_url_preview": audio_url[:200]})
     return audio_url
 
@@ -56,7 +56,10 @@ async def _download_audio(audio_url: str) -> str:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             audio_url,
-            headers={"Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"},
+            headers={
+                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                "apikey": SUPABASE_SERVICE_KEY,
+            },
             timeout=120,
             follow_redirects=True,
         )
