@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://redis:6379"
     SERVICE_PORT: int = 8006
 
+    SELF_BASE_URL: str = "http://ai-analyst-service:8006/api/v1"
     MEETING_SERVICE_URL: str = "http://meeting-service:8005/api/v1"
     TRANSCRIPTION_SERVICE_URL: str = "http://transcription-service:8004/api/v1"
     COMPANY_SERVICE_URL: str = "http://company-service:8003"
@@ -18,8 +19,6 @@ class Settings(BaseSettings):
 
     GROQ_API_KEY: str
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
-
-    TRANSCRIPTION_SERVICE_URL: str = "http://transcription-service:8004"
 
     class Config:
         env_file = ".env"  # dùng khi chạy local

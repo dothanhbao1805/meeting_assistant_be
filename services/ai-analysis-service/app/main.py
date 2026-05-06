@@ -33,5 +33,6 @@ app.include_router(router=speaker.router)
 app.include_router(router=task.router, prefix="/api/v1")
 
 
+@app.get("/")
 def root():
     return {"service": "ai-analysis-service", "status": "ok"}

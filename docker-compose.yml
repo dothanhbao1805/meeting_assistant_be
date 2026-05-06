@@ -256,8 +256,8 @@ services:
       AI_ANALYSIS_DATABASE_URL: postgresql+asyncpg://ai_analysis_user:ai_analysis_pass@db_ai_analysis:5432/ai_analysis_db
       REDIS_URL: redis://redis:6379
       TRANSCRIPTION_SERVICE_URL: http://transcription-service:8004
-      COMPANY_SERVICE_URL: http://company-service:8003
-      MEETING_SERVICE_URL: http://meeting-service:8005
+      COMPANY_SERVICE_URL: http://company-service:8003/api/v1
+      MEETING_SERVICE_URL: http://meeting-service:8005/api/v1
     depends_on:
       db_ai_analysis:
         condition: service_healthy

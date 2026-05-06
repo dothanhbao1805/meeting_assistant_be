@@ -14,6 +14,8 @@ from app.repositories.job_repo import TranscriptionJobRepo
 from app.repositories.transcript_repo import TranscriptRepo
 from app.repositories.utterance_repo import UtteranceRepo
 from app.schemas.webhook import DeepgramWebhookPayload
+from app.services.meeting_service_client import meeting_service_client
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +39,7 @@ class WebhookService:
     @staticmethod
     def requires_dg_token_verification() -> bool:
         return bool(
-            settings.DEEPGRAM_API_KEY_ID
-            and settings.DEEPGRAM_API_KEY_ID.strip()
+            settings.DEEPGRAM_API_KEY_ID and settings.DEEPGRAM_API_KEY_ID.strip()
         )
 
     @staticmethod
@@ -60,15 +61,12 @@ class WebhookService:
 
             decoded = base64.b64decode(token).decode("utf-8")
             username, _, password = decoded.partition(":")
-            return (
-                hmac.compare_digest(
-                    username,
-                    settings.DEEPGRAM_WEBHOOK_BASIC_USERNAME,
-                )
-                and hmac.compare_digest(
-                    password,
-                    settings.DEEPGRAM_WEBHOOK_BASIC_PASSWORD,
-                )
+            return hmac.compare_digest(
+                username,
+                settings.DEEPGRAM_WEBHOOK_BASIC_USERNAME,
+            ) and hmac.compare_digest(
+                password,
+                settings.DEEPGRAM_WEBHOOK_BASIC_PASSWORD,
             )
         except Exception as e:
             logger.error(f"Basic auth verification error: {e}")
@@ -174,10 +172,30 @@ class WebhookService:
                 f"{len(created_utterances)} utterances"
             )
 
+            try:
+                meeting_data = await meeting_service_client.get_meeting(
+                    str(job.meeting_id)
+                )
+                company_id = meeting_data["company_id"]
+                meeting_file_id = meeting_data["files"][0]["id"]
+            except Exception as e:
+                logger.error(
+                    f"Failed to fetch meeting data for job {job.id}, "
+                    f"skipping auto resolve: {e}"
+                )
+                return {
+                    "received": True,
+                    "job_id": str(job.id),
+                    "transcript_id": str(transcript.id),
+                    "utterances_count": len(created_utterances),
+                }
+
             await self._publish_transcription_completed_event(
                 job.id,
                 job.meeting_id,
                 transcript.id,
+                company_id=company_id,
+                meeting_file_id=meeting_file_id,
             )
 
             return {
@@ -193,9 +211,7 @@ class WebhookService:
             raise
 
     async def _find_job_by_deepgram_id(self, deepgram_request_id: str):
-        return await self.job_repo.get_by_deepgram_request_id(
-            deepgram_request_id
-        )
+        return await self.job_repo.get_by_deepgram_request_id(deepgram_request_id)
 
     def _parse_deepgram_response(self, payload: DeepgramWebhookPayload) -> dict:
         all_utterances = []
@@ -257,9 +273,7 @@ class WebhookService:
                         start_time_ms = int(
                             round(float(paragraph.get("start", 0)) * 1000)
                         )
-                        end_time_ms = int(
-                            round(float(paragraph.get("end", 0)) * 1000)
-                        )
+                        end_time_ms = int(round(float(paragraph.get("end", 0)) * 1000))
 
                         all_utterances.append(
                             {
@@ -278,11 +292,7 @@ class WebhookService:
                 transcript for transcript in fallback_transcripts if transcript
             ).strip()
 
-        confidence_avg = (
-            sum(confidences) / len(confidences)
-            if confidences
-            else 0.0
-        )
+        confidence_avg = sum(confidences) / len(confidences) if confidences else 0.0
 
         speaker_count = len(speaker_ids)
 
@@ -306,6 +316,8 @@ class WebhookService:
         job_id: uuid.UUID,
         meeting_id: uuid.UUID,
         transcript_id: uuid.UUID,
+        company_id: str,
+        meeting_file_id: str,
     ) -> None:
         try:
             event_payload = {
@@ -313,6 +325,8 @@ class WebhookService:
                 "job_id": str(job_id),
                 "meeting_id": str(meeting_id),
                 "transcript_id": str(transcript_id),
+                "company_id": company_id,
+                "meeting_file_id": meeting_file_id,
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
@@ -321,8 +335,6 @@ class WebhookService:
                 json.dumps(event_payload),
             )
 
-            logger.info(
-                f"Published transcription.completed event for job {job_id}"
-            )
+            logger.info(f"Published transcription.completed event for job {job_id}")
         except Exception as e:
             logger.error(f"Error publishing event: {e}")
