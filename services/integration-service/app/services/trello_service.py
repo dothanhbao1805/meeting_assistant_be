@@ -39,6 +39,21 @@ async def sync_tasks_to_trello(
 
     # 2. Xử lý từng task
     for task in confirmed_tasks:
+        existing_log = await repo.get_by_task_id(task.task_id)
+        if existing_log and existing_log.sync_status == "success":
+            results.append(
+                TrelloSyncResult(
+                    task_id=task.task_id,
+                    trello_card_id=existing_log.trello_card_id,
+                    trello_card_url=existing_log.trello_card_url,
+                    status="success",
+                )
+            )
+            logger.info(
+                f"[TRELLO] Task {task.task_id} already synced, skipping duplicate"
+            )
+            continue
+
         trello_member_id = None
         assigned_trello_user_id = None
 
@@ -124,6 +139,16 @@ async def sync_tasks_to_trello(
         "company_id": str(company_id),
         "synced_count": synced_count,
         "failed_count": failed_count,
+        "results": [
+            {
+                "task_id": str(result.task_id),
+                "trello_card_id": result.trello_card_id,
+                "trello_card_url": result.trello_card_url,
+                "status": result.status,
+                "error": result.error,
+            }
+            for result in results
+        ],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     try:

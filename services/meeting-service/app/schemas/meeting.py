@@ -35,6 +35,9 @@ class MeetingCreate(BaseModel):
     company_id: UUID
     scheduled_at: Optional[datetime] = None
     language_code: Optional[str] = "vi"
+    trello_board_id: Optional[str] = None
+    trello_board_name: Optional[str] = None
+    trello_list_id: Optional[str] = None
     participant_user_ids: Optional[List[UUID]] = []
 
 class MeetingOut(BaseModel):
@@ -42,6 +45,9 @@ class MeetingOut(BaseModel):
     title: str
     company_id: UUID
     created_by_user_id: UUID
+    trello_board_id: Optional[str] = None
+    trello_board_name: Optional[str] = None
+    trello_list_id: Optional[str] = None
     status: str
     scheduled_at: Optional[datetime]
     duration_seconds: Optional[int]

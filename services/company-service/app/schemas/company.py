@@ -28,6 +28,7 @@ class CompanyResponse(BaseModel):
     slug: str
     logo_url: Optional[str]
     trello_api_key: Optional[str]
+    trello_token: Optional[str]
     trello_workspace_id: Optional[str]
     owner_account_id: UUID
     status: str
