@@ -21,3 +21,18 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserMeResponse(BaseModel):
+    id: uuid.UUID
+    email: str
+    full_name: str | None
+    is_active: bool
+    role: UserRole
+    # Extra info from Company Service
+    company_id: uuid.UUID | None = None
+    member_role: str | None = None
+    is_trello_linked: bool = False
+    is_google_linked: bool = False
+
+    model_config = {"from_attributes": True}
