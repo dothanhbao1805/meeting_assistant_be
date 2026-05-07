@@ -53,6 +53,10 @@ async def get_all_members(db: AsyncSession) -> list[Member]:
     return await member_repo.get_all_members(db)
 
 
+async def get_member_by_account_id(db: AsyncSession, account_id: UUID) -> Optional[Member]:
+    return await member_repo.get_member_by_account_id(db, account_id)
+
+
 async def update_member(db: AsyncSession, member_id: str, data: MemberUpdate) -> Member:
     member = await member_repo.get_member_by_id(db, member_id)
     if not member:

@@ -102,6 +102,14 @@ async def get_member_by_id(member_id: str, db: AsyncSession = Depends(get_compan
     return await member_service.get_member_by_id(db, member_id)
 
 
+@router.get("/account/{account_id}", response_model=MemberResponse)
+async def get_member_by_account_id(account_id: UUID, db: AsyncSession = Depends(get_company_db)):
+    member = await member_service.get_member_by_account_id(db, account_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found for this account")
+    return member
+
+
 @router.put("/{member_id}", response_model=MemberResponse)
 async def update_member(
     member_id: str,
