@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
+    COMPANY_SERVICE_URL: str = "http://company-service:8003"
 
     class Config:
         env_file = ".env"
