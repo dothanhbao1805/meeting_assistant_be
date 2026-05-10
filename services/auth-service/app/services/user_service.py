@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password
 from app.models.user import User
 from app.repositories import user_repo
-from app.schemas.user import UserCreate
+from app.schemas.user import UpdateUser, UserCreate
 
 
 async def create_user(db: AsyncSession, data: UserCreate) -> User:
@@ -20,6 +20,12 @@ async def create_user(db: AsyncSession, data: UserCreate) -> User:
 
 async def get_all_users(db: AsyncSession) -> list[User]:
     return await user_repo.get_all_users(db)
+
+async def update_user(db: AsyncSession, user_id: str, data: UpdateUser) -> User:
+    user = await user_repo.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User không tồn tại")
+    return await user_repo.update_user(db, user_id, data.is_onboarded)
 
 
 async def delete_user(db: AsyncSession, user_id: str) -> None:

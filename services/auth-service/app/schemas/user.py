@@ -11,6 +11,8 @@ class UserCreate(BaseModel):
     password: str
     full_name: str | None = None
 
+class UpdateUser(BaseModel):
+    is_onboarded: bool 
 
 class UserResponse(BaseModel):
     id: uuid.UUID
@@ -18,6 +20,7 @@ class UserResponse(BaseModel):
     full_name: str | None
     is_active: bool
     role: UserRole
+    is_onboarded: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.core.deps import get_current_user, get_auth_db, require_role
 from app.db.database import get_auth_db
 from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserResponse, UserMeResponse
+from app.schemas.user import UpdateUser, UserCreate, UserResponse, UserMeResponse
 from app.services import user_service
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -47,6 +47,13 @@ async def get_all_users(
 ):
     return await user_service.get_all_users(db)
 
+@router.put("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: str,
+    data: UpdateUser,
+    db: AsyncSession = Depends(get_auth_db),
+):
+    return await user_service.update_user(db, user_id, data)
 
 @router.delete("/{user_id}", status_code=204)
 async def delete_user(

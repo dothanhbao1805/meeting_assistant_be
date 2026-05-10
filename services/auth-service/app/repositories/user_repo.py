@@ -30,6 +30,14 @@ async def create_user(
     await db.refresh(user)
     return user
 
+async def update_user(db: AsyncSession, user_id: str, is_onboarded: bool) -> User:
+    result = await db.execute(select(User).where(User.id == user_id))  # ← sửa lại
+    user = result.scalar_one_or_none()
+    if user:
+        user.is_onboarded = is_onboarded
+        await db.commit()
+        await db.refresh(user)
+    return user
 
 async def delete_user(db: AsyncSession, user_id: str) -> None:
     user = await get_user_by_id(db, user_id)
