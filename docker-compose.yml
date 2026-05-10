@@ -300,6 +300,8 @@ services:
       - company-service
       - transcription-service
       - meeting-service
+    env_file:
+      - ./services/api-gateway/.env
     networks:
       - meeting_network
 
