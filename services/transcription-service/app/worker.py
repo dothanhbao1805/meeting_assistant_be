@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 async def process_message(message: dict):
     """
     Xử lý message từ Redis queue
-    
+
     Flow:
     1. Kiểm tra idempotency (job đã tồn tại?)
     2. Tạo job mới (status=queued)
@@ -22,7 +22,7 @@ async def process_message(message: dict):
     4. Cập nhật job với deepgram_request_id (status=processing)
     5. Nếu lỗi, cập nhật status=failed
     """
-    
+
     async with AsyncSessionLocal() as db:
         repo = TranscriptionJobRepo(db)
 
@@ -64,7 +64,7 @@ async def process_message(message: dict):
 
         # Lay signed URL tu message
         signed_url = message.get("signed_url")
-        
+
         if not signed_url:
             error_msg = "Missing signed_url in message"
             logger.error(error_msg)
@@ -82,18 +82,18 @@ async def process_message(message: dict):
                 model=job.model or "nova-2",
                 options=job.options,
             )
-            
+
             # Cap nhat job voi deepgram_request_id va status=processing
             job.deepgram_request_id = dg_result["dg_request_id"]
             job.status = "processing"
             job.started_at = datetime.utcnow()
             await db.commit()
-            
+
             logger.info(
                 f"Job {job.id} sent to Deepgram — "
                 f"deepgram_request_id: {job.deepgram_request_id}"
             )
-            
+
         except Exception as e:
             logger.error(f"Error calling Deepgram: {e}", exc_info=True)
             job.status = "failed"
@@ -120,4 +120,3 @@ async def run_worker():
 
 if __name__ == "__main__":
     asyncio.run(run_worker())
-

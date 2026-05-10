@@ -14,13 +14,3 @@ async def get_meeting_internal(
 ):
     service = MeetingService(db)
     return await service.get_meeting(uuid.UUID(meeting_id))
-router = APIRouter(prefix="/internal/meetings", tags=["internal"])
-
-
-@router.get("/{meeting_id}")
-async def get_meeting_internal(
-    meeting_id: str,
-    db: AsyncSession = Depends(get_meeting_db),
-):
-    service = MeetingService(db)
-    return await service.get_meeting(uuid.UUID(meeting_id))

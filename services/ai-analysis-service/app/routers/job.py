@@ -20,7 +20,6 @@ async def create_analysis_job(
 ):
     repo = AnalysisJobRepo(db)
 
-    # Idempotency — tránh tạo duplicate job
     existing = await repo.get_by_meeting_and_transcript(
         meeting_id=payload.meeting_id,
         transcript_id=payload.transcript_id,
@@ -30,20 +29,20 @@ async def create_analysis_job(
             status_code=409, detail=f"Job đã tồn tại cho transcript này: {existing.id}"
         )
 
-    # Tạo job
     job = await repo.create(
         {
             "meeting_id": payload.meeting_id,
             "transcript_id": payload.transcript_id,
-            "model": payload.model or settings.GROQ_MODEL,
+            "company_id": payload.company_id,  # thêm
+            "ai_model": payload.model or settings.GROQ_MODEL,
         }
     )
 
-    # Push vào queue
     message = {
         "job_id": str(job.id),
         "meeting_id": str(job.meeting_id),
         "transcript_id": str(job.transcript_id),
+        "company_id": str(job.company_id) if job.company_id else None,  # thêm
     }
     await redis_client.lpush(QUEUE_ANALYSIS, json.dumps(message))
 

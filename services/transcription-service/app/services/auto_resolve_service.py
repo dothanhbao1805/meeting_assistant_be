@@ -15,8 +15,12 @@ from app.utils.speaker_matcher import MemberEmbedding, find_best_match
 
 logger = logging.getLogger(__name__)
 
-COMPANY_SERVICE_URL = os.getenv("COMPANY_SERVICE_URL", "http://company-service:8003/api/v1")
-MEETING_SERVICE_URL = os.getenv("MEETING_SERVICE_URL", "http://meeting-service:8005/api/v1")
+COMPANY_SERVICE_URL = os.getenv(
+    "COMPANY_SERVICE_URL", "http://company-service:8003/api/v1"
+)
+MEETING_SERVICE_URL = os.getenv(
+    "MEETING_SERVICE_URL", "http://meeting-service:8005/api/v1"
+)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 SIMILARITY_THRESHOLD = float(os.getenv("SPEAKER_SIMILARITY_THRESHOLD", "0.75"))
@@ -25,7 +29,9 @@ UTTERANCES_PER_SPEAKER = 3
 
 async def _get_audio_url(meeting_file_id: str, token: str) -> str:
     request_url = f"{MEETING_SERVICE_URL}/meeting-files/{meeting_file_id}"
-    logger.info("Fetching meeting file metadata", extra={"meeting_file_id": meeting_file_id})
+    logger.info(
+        "Fetching meeting file metadata", extra={"meeting_file_id": meeting_file_id}
+    )
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             request_url,
@@ -62,18 +68,22 @@ async def _download_audio(audio_url: str) -> str:
     suffix = ".mp3" if "mp3" in audio_url else ".wav"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(resp.content)
-        logger.info("Audio written to temp file", extra={"tmp_audio_path": tmp.name, "size_bytes": len(resp.content)})
+        logger.info(
+            "Audio written to temp file",
+            extra={"tmp_audio_path": tmp.name, "size_bytes": len(resp.content)},
+        )
         return tmp.name
 
 
 async def _fetch_participant_user_ids(meeting_id: str, token: str) -> List[str]:
-    """Lấy danh sách user_id của participants trong cuộc họp."""
-    request_url = f"{MEETING_SERVICE_URL}/meetings/{meeting_id}"
+
+    # Mới: dùng internal endpoint — không cần auth
+    request_url = f"{MEETING_SERVICE_URL}/internal/meetings/{meeting_id}"
+
     logger.info("Fetching meeting participants", extra={"meeting_id": meeting_id})
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             request_url,
-            headers={"Authorization": token},
             timeout=10,
         )
         resp.raise_for_status()
@@ -88,7 +98,9 @@ async def _fetch_participant_user_ids(meeting_id: str, token: str) -> List[str]:
     return user_ids
 
 
-async def _fetch_members_with_embeddings(company_id: str, token: str) -> Dict[str, dict]:
+async def _fetch_members_with_embeddings(
+    company_id: str, token: str
+) -> Dict[str, dict]:
     """Lấy members của công ty có voice_embedding, keyed by user id."""
     request_url = f"{COMPANY_SERVICE_URL}/members"
     logger.info("Fetching company members", extra={"company_id": company_id})
@@ -207,22 +219,32 @@ async def auto_resolve_speakers(
                 if utt.start_time_ms is None or utt.end_time_ms is None:
                     continue
                 try:
-                    audio_bytes = crop_audio_bytes(tmp_audio_path, utt.start_time_ms, utt.end_time_ms)
+                    audio_bytes = crop_audio_bytes(
+                        tmp_audio_path, utt.start_time_ms, utt.end_time_ms
+                    )
                     emb = compute_embedding_from_bytes(audio_bytes)
                     embeddings.append(emb)
                 except Exception as e:
-                    logger.warning("Crop failed", extra={"utterance_id": str(utt.id), "error": str(e)})
+                    logger.warning(
+                        "Crop failed",
+                        extra={"utterance_id": str(utt.id), "error": str(e)},
+                    )
 
             if not embeddings:
                 speaker_to_user[speaker_label] = None
                 continue
 
             avg_emb = average_embeddings(embeddings)
-            matched_user_id = find_best_match(avg_emb, candidates, threshold=SIMILARITY_THRESHOLD)
+            matched_user_id = find_best_match(
+                avg_emb, candidates, threshold=SIMILARITY_THRESHOLD
+            )
             speaker_to_user[speaker_label] = matched_user_id
             logger.info(
                 "Speaker matched",
-                extra={"speaker_label": speaker_label, "matched_user_id": matched_user_id},
+                extra={
+                    "speaker_label": speaker_label,
+                    "matched_user_id": matched_user_id,
+                },
             )
 
         # ── 6. Gán resolved_user_id hàng loạt ────────────────────────────────
@@ -238,7 +260,9 @@ async def auto_resolve_speakers(
                 )
                 .values(resolved_user_id=uuid.UUID(user_id))
             )
-            total_resolved += sum(1 for u in utterances if u.speaker_label == speaker_label)
+            total_resolved += sum(
+                1 for u in utterances if u.speaker_label == speaker_label
+            )
 
         await db.commit()
         logger.info("Commit done", extra={"utterances_resolved": total_resolved})

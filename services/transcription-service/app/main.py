@@ -4,12 +4,14 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from app.routers import job, webhook, transcript, utterance
 from app.worker import run_worker
+from app.workers.auto_resolve_worker import (
+    run_worker as run_auto_resolve_worker,
+)  # ← thêm
 
 app = FastAPI(title="Transcription Service")
 
 app.include_router(job.router, prefix="/api/v1")
 app.include_router(webhook.router, prefix="/api/v1")
-
 app.include_router(transcript.router)
 app.include_router(utterance.router, prefix="/api/v1")
 
@@ -34,12 +36,14 @@ def custom_openapi():
     app.openapi_schema = schema
     return schema
 
+
 app.openapi = custom_openapi
 
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(run_worker())
+    asyncio.create_task(run_auto_resolve_worker())  # ← thêm
 
 
 @app.get("/")

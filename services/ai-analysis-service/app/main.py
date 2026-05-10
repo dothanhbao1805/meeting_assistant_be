@@ -12,6 +12,12 @@ from app.routers import speaker
 from app.routers import task
 from app.routers import summary
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+
+
 app = FastAPI(title="AI Analysis Service")
 app.include_router(job.router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
@@ -29,5 +35,6 @@ app.include_router(router=speaker.router)
 app.include_router(router=task.router, prefix="/api/v1")
 
 
+@app.get("/")
 def root():
     return {"service": "ai-analysis-service", "status": "ok"}

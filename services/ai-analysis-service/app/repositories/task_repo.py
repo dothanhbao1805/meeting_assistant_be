@@ -24,13 +24,13 @@ class ExtractedTaskRepo:
                 raw_assignee_text=t.get("raw_assignee_text"),
                 resolved_user_id=t.get("resolved_user_id"),  # thêm
                 deadline_raw=t.get("deadline_raw"),
-                deadline_date=t.get("deadline_date"),          # thêm
+                deadline_date=t.get("deadline_date"),  # thêm
                 priority=t.get("priority", "medium"),
                 status="pending",
                 ai_confidence=t.get("ai_confidence"),
                 created_at=datetime.now(timezone.utc),
             )
-                for t in tasks
+            for t in tasks
         ]
         self.db.add_all(objects)
         await self.db.commit()
@@ -70,7 +70,7 @@ class ExtractedTaskRepo:
             query = query.where(ExtractedTask.status == status)
         if resolved_user_id:
             query = query.where(ExtractedTask.resolved_user_id == resolved_user_id)
-        
+
         result = await self.db.execute(query)
         return result.scalars().all()
 
@@ -134,6 +134,18 @@ class ExtractedTaskRepo:
 
         result = await self.db.execute(stmt)
         await self.db.commit()
+        return result.scalar_one_or_none()
+
+    async def get_task_by_id(self, task_id: uuid.UUID) -> ExtractedTask | None:
+        result = await self.db.execute(
+            select(ExtractedTask).where(ExtractedTask.id == task_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_analysis_job_by_id(self, job_id: uuid.UUID) -> AnalysisJob | None:
+        result = await self.db.execute(
+            select(AnalysisJob).where(AnalysisJob.id == job_id)
+        )
         return result.scalar_one_or_none()
 
 

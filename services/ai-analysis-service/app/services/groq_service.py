@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 client = AsyncGroq(api_key=settings.GROQ_API_KEY)
 
 
-def _build_conversation(utterances: list[dict], participants: list[dict] | None = None) -> str:
+def _build_conversation(
+    utterances: list[dict], participants: list[dict] | None = None
+) -> str:
     user_map = {}
     if participants:
         for p in participants:
@@ -67,7 +69,7 @@ Nội dung cuộc họp:
 TASK_PROMPT = """Bạn là trợ lý trích xuất công việc từ cuộc họp. Dựa vào nội dung hội thoại sau, hãy trả về JSON array:
 [
   {{
-    "title": "tên công việc ngắn gọn",
+    "title": "tên công việc",
     "description": "mô tả chi tiết",
     "raw_assignee_text": "tên người được giao (hoặc null)",
     "deadline_raw": "deadline dạng text (hoặc null)",
@@ -75,6 +77,14 @@ TASK_PROMPT = """Bạn là trợ lý trích xuất công việc từ cuộc họ
     "ai_confidence": 0.0
   }}
 ]
+
+Quy tắc BẮT BUỘC:
+- Chỉ trích xuất task được đề cập RÕ RÀNG trong hội thoại, KHÔNG tự thêm task không có trong transcript
+- Phân biệt rõ NGƯỜI NÓI và NGƯỜI ĐƯỢC GIAO việc:
+  * "Hoàng làm đi", "giao cho Hoàng", "Hoàng phụ trách" → raw_assignee_text = "Hoàng" dù ai đang nói
+  * Người nói tự nhận: "mình làm", "tôi tự làm", "Bảo tự làm", "mình nhận" → raw_assignee_text = tên người đang nói câu đó
+  * Chưa rõ: "để sau tính", "chưa biết giao cho ai" → raw_assignee_text = null
+- Dùng ĐÚNG tên trong danh sách người tham gia bên dưới, không viết tắt, không đổi tên
 
 Chỉ trả về JSON array, không giải thích thêm.
 {participant_hint}
@@ -103,7 +113,9 @@ async def analyze_meeting(
         logger.info(f"[groq_service] Participants hint: {names}")
     else:
         participant_hint = ""
-        logger.warning("[groq_service] Không có participants — Groq sẽ tự đoán assignee")
+        logger.warning(
+            "[groq_service] Không có participants — Groq sẽ tự đoán assignee"
+        )
 
     summary_msg = [
         {"role": "user", "content": SUMMARY_PROMPT.format(conversation=conversation)}
@@ -126,8 +138,12 @@ async def analyze_meeting(
     summary_content = summary_resp.choices[0].message.content
     task_content = task_resp.choices[0].message.content
 
-    logger.info(f"[groq_service] summary finish_reason={summary_resp.choices[0].finish_reason}")
-    logger.info(f"[groq_service] task finish_reason={task_resp.choices[0].finish_reason}")
+    logger.info(
+        f"[groq_service] summary finish_reason={summary_resp.choices[0].finish_reason}"
+    )
+    logger.info(
+        f"[groq_service] task finish_reason={task_resp.choices[0].finish_reason}"
+    )
 
     summary_data = _parse_json(summary_content, "summary")
     tasks_data = _parse_json(task_content, "tasks")
@@ -137,7 +153,9 @@ async def analyze_meeting(
         tasks_data = []
 
     input_tokens = summary_resp.usage.prompt_tokens + task_resp.usage.prompt_tokens
-    output_tokens = summary_resp.usage.completion_tokens + task_resp.usage.completion_tokens
+    output_tokens = (
+        summary_resp.usage.completion_tokens + task_resp.usage.completion_tokens
+    )
 
     logger.info(
         f"[groq_service] Done — tokens in={input_tokens} out={output_tokens}, tasks={len(tasks_data)}"
