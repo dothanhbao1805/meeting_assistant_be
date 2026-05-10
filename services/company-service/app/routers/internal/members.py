@@ -28,3 +28,14 @@ async def get_member_by_account(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     return member
+
+
+@router.get("/{member_id}", response_model=MemberInternal)
+async def get_member_by_id(
+    member_id: str,
+    db: AsyncSession = Depends(get_company_db),
+):
+    member = await member_repo.get_member_by_id(db, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    return member

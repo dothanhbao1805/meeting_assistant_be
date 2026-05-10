@@ -7,6 +7,7 @@ from uuid import UUID
 class AnalysisJobCreate(BaseModel):
     meeting_id: UUID
     transcript_id: UUID
+    company_id: Optional[UUID] = None
     model: Optional[str] = "llama-3.3-70b-versatile"
 
 
@@ -14,6 +15,7 @@ class AnalysisJobResponse(BaseModel):
     id: UUID
     meeting_id: UUID
     transcript_id: UUID
+    company_id: Optional[UUID] = None
     status: str
     ai_model: Optional[str] = None
     input_tokens: Optional[int] = None

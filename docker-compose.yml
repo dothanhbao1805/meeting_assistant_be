@@ -151,12 +151,14 @@ services:
     env_file:
       - ./services/auth-service/.env
     environment:
-      DATABASE_URL: postgresql://auth_user:auth_pass@db_auth:5432/auth_db
+      DATABASE_URL: postgresql+asyncpg://auth_user:auth_pass@db_auth:5432/auth_db
     depends_on:
       db_auth:
         condition: service_healthy
     networks:
       - meeting_network
+    volumes:
+      - ./services/auth-service:/app
 
   # ─── AI Service ─────────────────────────────
   ai-service:
@@ -220,6 +222,8 @@ services:
         condition: service_healthy
     networks:
       - meeting_network
+    volumes:
+      - ./services/transcription-service:/app
 
   # ─── Meeting Service ────────────────────────
   meeting-service:
@@ -256,8 +260,8 @@ services:
       AI_ANALYSIS_DATABASE_URL: postgresql+asyncpg://ai_analysis_user:ai_analysis_pass@db_ai_analysis:5432/ai_analysis_db
       REDIS_URL: redis://redis:6379
       TRANSCRIPTION_SERVICE_URL: http://transcription-service:8004
-      COMPANY_SERVICE_URL: http://company-service:8003
-      MEETING_SERVICE_URL: http://meeting-service:8005
+      COMPANY_SERVICE_URL: http://company-service:8003/api/v1
+      MEETING_SERVICE_URL: http://meeting-service:8005/api/v1
     depends_on:
       db_ai_analysis:
         condition: service_healthy
@@ -300,6 +304,9 @@ services:
       - company-service
       - transcription-service
       - meeting-service
+    volumes:
+      - ./services/api-gateway:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     env_file:
       - ./services/api-gateway/.env
     networks:

@@ -11,6 +11,7 @@ class AnalysisJob(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     meeting_id = Column(UUID(as_uuid=True), nullable=False)
     transcript_id = Column(UUID(as_uuid=True), nullable=False)
+    company_id = Column(UUID(as_uuid=True), nullable=True)
     status = Column(String(50), nullable=False, default="queued")
     # status: queued | processing | done | failed
     ai_model = Column(String(100), nullable=True)

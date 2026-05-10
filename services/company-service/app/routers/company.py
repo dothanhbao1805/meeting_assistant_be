@@ -15,6 +15,7 @@ async def create_company(
     trello_api_key: str | None = Form(None),
     trello_workspace_id: str | None = Form(None),
     owner_account_id: str = Form(...),
+    industry_code: str | None = Form(None),
     logo_file: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_company_db),
 ):
@@ -24,6 +25,7 @@ async def create_company(
         trello_api_key=trello_api_key,
         trello_workspace_id=trello_workspace_id,
         owner_account_id=owner_account_id,
+        industry_code=industry_code,
     )
 
     return await company_service.create_company(db, data, logo_file)

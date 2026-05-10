@@ -11,6 +11,7 @@ class CompanyCreate(BaseModel):
     trello_api_key: Optional[str] = None
     trello_workspace_id: Optional[str] = None
     owner_account_id: UUID
+    industry_code: Optional[str] = None
 
 
 class CompanyUpdate(BaseModel):

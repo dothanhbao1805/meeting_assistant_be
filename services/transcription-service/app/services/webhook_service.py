@@ -14,6 +14,7 @@ from app.repositories.job_repo import TranscriptionJobRepo
 from app.repositories.transcript_repo import TranscriptRepo
 from app.repositories.utterance_repo import UtteranceRepo
 from app.schemas.webhook import DeepgramWebhookPayload
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +38,7 @@ class WebhookService:
     @staticmethod
     def requires_dg_token_verification() -> bool:
         return bool(
-            settings.DEEPGRAM_API_KEY_ID
-            and settings.DEEPGRAM_API_KEY_ID.strip()
+            settings.DEEPGRAM_API_KEY_ID and settings.DEEPGRAM_API_KEY_ID.strip()
         )
 
     @staticmethod
@@ -60,15 +60,12 @@ class WebhookService:
 
             decoded = base64.b64decode(token).decode("utf-8")
             username, _, password = decoded.partition(":")
-            return (
-                hmac.compare_digest(
-                    username,
-                    settings.DEEPGRAM_WEBHOOK_BASIC_USERNAME,
-                )
-                and hmac.compare_digest(
-                    password,
-                    settings.DEEPGRAM_WEBHOOK_BASIC_PASSWORD,
-                )
+            return hmac.compare_digest(
+                username,
+                settings.DEEPGRAM_WEBHOOK_BASIC_USERNAME,
+            ) and hmac.compare_digest(
+                password,
+                settings.DEEPGRAM_WEBHOOK_BASIC_PASSWORD,
             )
         except Exception as e:
             logger.error(f"Basic auth verification error: {e}")
@@ -174,6 +171,31 @@ class WebhookService:
                 f"{len(created_utterances)} utterances"
             )
 
+            try:
+                async with httpx.AsyncClient(timeout=5) as client:
+                    resp = await client.get(
+                        f"{settings.MEETING_SERVICE_URL}/internal/meetings/{str(job.meeting_id)}"
+                    )
+                    meeting_data = resp.json()
+                    company_id = meeting_data.get("company_id")
+            except Exception as e:
+                logger.warning(f"Không lấy được company_id: {e}")
+                company_id = None
+
+            # Apply corrections nếu có company_id
+            if company_id:
+                created_utterances = await self._apply_corrections(
+                    created_utterances, company_id
+                )
+                await self.db.commit()
+
+            await self._publish_transcription_completed_event(
+                job.id,
+                job.meeting_id,
+                transcript.id,
+                company_id=company_id,  # thêm
+            )
+
             await self._publish_transcription_completed_event(
                 job.id,
                 job.meeting_id,
@@ -193,9 +215,7 @@ class WebhookService:
             raise
 
     async def _find_job_by_deepgram_id(self, deepgram_request_id: str):
-        return await self.job_repo.get_by_deepgram_request_id(
-            deepgram_request_id
-        )
+        return await self.job_repo.get_by_deepgram_request_id(deepgram_request_id)
 
     def _parse_deepgram_response(self, payload: DeepgramWebhookPayload) -> dict:
         all_utterances = []
@@ -257,9 +277,7 @@ class WebhookService:
                         start_time_ms = int(
                             round(float(paragraph.get("start", 0)) * 1000)
                         )
-                        end_time_ms = int(
-                            round(float(paragraph.get("end", 0)) * 1000)
-                        )
+                        end_time_ms = int(round(float(paragraph.get("end", 0)) * 1000))
 
                         all_utterances.append(
                             {
@@ -278,11 +296,7 @@ class WebhookService:
                 transcript for transcript in fallback_transcripts if transcript
             ).strip()
 
-        confidence_avg = (
-            sum(confidences) / len(confidences)
-            if confidences
-            else 0.0
-        )
+        confidence_avg = sum(confidences) / len(confidences) if confidences else 0.0
 
         speaker_count = len(speaker_ids)
 
@@ -306,13 +320,22 @@ class WebhookService:
         job_id: uuid.UUID,
         meeting_id: uuid.UUID,
         transcript_id: uuid.UUID,
+        company_id: str = None,
     ) -> None:
         try:
+            # Lấy meeting_file_id từ job
+            job = await self.job_repo.get_by_id(job_id)
+            meeting_file_id = (
+                str(job.media_file_id) if job and job.media_file_id else None
+            )
+
             event_payload = {
                 "event": "transcription.completed",
                 "job_id": str(job_id),
                 "meeting_id": str(meeting_id),
                 "transcript_id": str(transcript_id),
+                "company_id": company_id,
+                "meeting_file_id": meeting_file_id,
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
@@ -320,9 +343,33 @@ class WebhookService:
                 CHANNEL_TRANSCRIPTION_COMPLETED,
                 json.dumps(event_payload),
             )
-
-            logger.info(
-                f"Published transcription.completed event for job {job_id}"
-            )
+            logger.info(f"Published transcription.completed event for job {job_id}")
         except Exception as e:
             logger.error(f"Error publishing event: {e}")
+
+    async def _fetch_corrections(self, company_id: str) -> list[dict]:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.get(
+                    f"{settings.COMPANY_SERVICE_URL}/internal/corrections/{company_id}"
+                )
+                if resp.status_code == 200:
+                    return resp.json()
+        except Exception as e:
+            logger.warning(f"Không lấy được corrections: {e}")
+        return []
+
+    async def _apply_corrections(self, utterances, company_id: str):
+        corrections = await self._fetch_corrections(company_id)
+        if not corrections:
+            return utterances
+
+        for utterance in utterances:
+            for correction in corrections:
+                wrong = correction["wrong_text"]
+                correct = correction["correct_text"]
+                if wrong in utterance.text.lower():
+                    utterance.text = utterance.text.lower().replace(wrong, correct)
+                    logger.info(f"Applied correction: '{wrong}' → '{correct}'")
+
+        return utterances

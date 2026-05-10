@@ -17,29 +17,32 @@ from app.services.event_publisher import publish_analysis_completed
 
 logger = logging.getLogger(__name__)
 
-
-# deadline_normalizer.py
 WORD_TO_NUM = {
-    "một": 1, "hai": 2, "ba": 3, "bốn": 4, "năm": 5,
-    "sáu": 6, "bảy": 7, "tám": 8, "chín": 9, "mười": 10,
+    "một": 1,
+    "hai": 2,
+    "ba": 3,
+    "bốn": 4,
+    "năm": 5,
+    "sáu": 6,
+    "bảy": 7,
+    "tám": 8,
+    "chín": 9,
+    "mười": 10,
 }
 
 FILLER_WORDS = ["vòng", "khoảng", "trong", "tầm", "chừng", "khoảng chừng"]
+
 
 def normalize_deadline(text: str) -> str:
     if not text:
         return text
     result = text.lower().strip()
-    
-    # Xóa từ ước lượng
     for word in FILLER_WORDS:
         result = result.replace(word, "").strip()
-    
-    # Chuyển số chữ → số
     for word, num in WORD_TO_NUM.items():
         result = result.replace(word, str(num))
-    
     return result.strip()
+
 
 async def process_message(message: dict):
     async with AsyncSessionLocal() as db:
@@ -52,7 +55,9 @@ async def process_message(message: dict):
             logger.error(f"Job không tồn tại: {message['job_id']}")
             return
 
-        await job_repo.update(job, status="processing", started_at=datetime.now(timezone.utc))
+        await job_repo.update(
+            job, status="processing", started_at=datetime.now(timezone.utc)
+        )
 
         try:
             # 1. Lấy utterances từ Transcription Service
@@ -61,49 +66,66 @@ async def process_message(message: dict):
                 raise ValueError("Không có utterances để phân tích")
 
             # 2. Lấy participants (user_id + full_name) từ Meeting + Company Service
-            participants = await fetch_participants(str(job.meeting_id))
+            participants = await fetch_participants(
+                str(job.meeting_id), str(job.transcript_id)
+            )
             logger.info(f"[DEBUG] Participants ({len(participants)}): {participants}")
 
             # 3. Gọi Groq song song: summary + task extraction
-            summary_data, tasks_data, input_tokens, output_tokens = await analyze_meeting(
+            (
+                summary_data,
+                tasks_data,
+                input_tokens,
+                output_tokens,
+            ) = await analyze_meeting(
                 utterances=utterances,
                 model=job.ai_model,
                 participants=participants,
             )
-            logger.info(f"[DEBUG] Tasks từ Groq: {json.dumps(tasks_data, ensure_ascii=False)}")
+            logger.info(
+                f"[DEBUG] Tasks từ Groq: {json.dumps(tasks_data, ensure_ascii=False)}"
+            )
 
             # 4. AI tự map assignee_name → resolved_user_id
             tasks_data = map_assignees(tasks_data, participants)
-            logger.info(f"[DEBUG] Tasks sau map: {[(t['title'], t.get('raw_assignee_text'), t.get('resolved_user_id')) for t in tasks_data]}")
+            logger.info(
+                f"[DEBUG] Tasks sau map: {[(t['title'], t.get('raw_assignee_text'), t.get('resolved_user_id')) for t in tasks_data]}"
+            )
 
-            # 5. Parse deadline_raw → deadline_date
+            # 5. Normalize + parse deadline_raw → deadline_date
             ref_date = date.today()
             for task in tasks_data:
                 raw = task.get("deadline_raw")
-                normalized = normalize_deadline(raw)          
+                normalized = normalize_deadline(raw)
                 task["deadline_date"] = parse_deadline(normalized, ref_date)
 
             # Log kết quả map
             for t in tasks_data:
                 status = "✅" if t.get("resolved_user_id") else "⚠️ cần user gán"
-                logger.info(f"{status} Task: {t['title']} | assignee: {t.get('raw_assignee_text')} → {t.get('resolved_user_id')}")
+                logger.info(
+                    f"{status} Task: {t['title']} | assignee: {t.get('raw_assignee_text')} → {t.get('resolved_user_id')}"
+                )
 
             # 6. Lưu summary
-            summary = await summary_repo.create({
-                "analysis_job_id": job.id,
-                "meeting_id": job.meeting_id,
-                **summary_data,
-            })
-
-            # 7. Lưu tasks
-            created_tasks = await task_repo.bulk_create([
+            summary = await summary_repo.create(
                 {
                     "analysis_job_id": job.id,
                     "meeting_id": job.meeting_id,
-                    **task,
+                    **summary_data,
                 }
-                for task in tasks_data
-            ])
+            )
+
+            # 7. Lưu tasks
+            created_tasks = await task_repo.bulk_create(
+                [
+                    {
+                        "analysis_job_id": job.id,
+                        "meeting_id": job.meeting_id,
+                        **task,
+                    }
+                    for task in tasks_data
+                ]
+            )
 
             # 8. Cập nhật job → done
             await job_repo.update(

@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
 
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004"]

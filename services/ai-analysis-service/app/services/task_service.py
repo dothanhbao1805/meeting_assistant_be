@@ -9,6 +9,11 @@ from fastapi import HTTPException
 from app.core.config import settings
 from app.repositories.task_repo import TaskRepo
 from app.schemas.task import CreateTaskRequest, SkippedTask
+from difflib import SequenceMatcher
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 CHANNEL_TASKS_CONFIRMED = "tasks.confirmed"
 
@@ -23,12 +28,6 @@ class TaskService:
         if not job:
             raise HTTPException(status_code=404, detail="Analysis job not found")
         return await self.repo.create_task(data, analysis_job_id=job.id)
-
-    async def update_task(self, task_id: uuid.UUID, data: dict):
-        task = await self.repo.update_task(task_id, data)
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        return task
 
     async def confirm_all_tasks(self, meeting_id: uuid.UUID):
         tasks = await self.repo.get_tasks_by_meeting(meeting_id)
@@ -136,3 +135,71 @@ class TaskService:
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Redis error: {e}")
+
+    def extract_word_corrections(self, old_text: str, new_text: str) -> list[dict]:
+        old_words = old_text.lower().split()
+        new_words = new_text.lower().split()
+        corrections = []
+        matcher = SequenceMatcher(None, old_words, new_words)
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "replace":
+                wrong = " ".join(old_words[i1:i2])
+                correct = " ".join(new_words[j1:j2])
+                if wrong and correct:
+                    corrections.append({"wrong_text": wrong, "correct_text": correct})
+        return corrections
+
+    async def save_corrections_to_company(
+        self, company_id: str, corrections: list[dict]
+    ):
+        logger.info(
+            f"[corrections] Gọi company-service, company_id={company_id}, corrections={corrections}"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                url = f"{settings.COMPANY_SERVICE_URL}/internal/corrections"
+                logger.info(f"[corrections] POST {url}")
+                resp = await client.post(
+                    url, json={"company_id": company_id, "corrections": corrections}
+                )
+                resp.raise_for_status()
+                logger.info(f"[corrections] Response: {resp.status_code} {resp.text}")
+        except Exception as e:
+            logger.warning(f"[corrections] Lỗi: {e}")
+
+    async def update_task(self, task_id: uuid.UUID, data: dict):
+        old_task = await self.repo.get_task_by_id(task_id)
+        if not old_task:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        # Lưu lại giá trị cũ trước khi update (tránh SQLAlchemy refresh)
+        old_title = old_task.title
+        old_description = old_task.description or ""
+
+        job = await self.repo.get_analysis_job_by_id(old_task.analysis_job_id)
+        company_id = str(job.company_id) if job and job.company_id else None
+
+        task = await self.repo.update_task(task_id, data)
+
+        if company_id:
+            corrections = []
+
+            if "title" in data and data["title"] != old_title:
+                corrections.extend(
+                    self.extract_word_corrections(old_title, data["title"])
+                )
+
+            if "description" in data and data["description"] != old_description:
+                corrections.extend(
+                    self.extract_word_corrections(
+                        old_description, data["description"] or ""
+                    )
+                )
+
+            if corrections:
+                await self.save_corrections_to_company(company_id, corrections)
+                logger.info(
+                    f"Saved {len(corrections)} corrections cho company {company_id}: {corrections}"
+                )
+
+        return task

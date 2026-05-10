@@ -1,21 +1,18 @@
 import json
 import logging
-import uuid
-
+import httpx
+from app.core.redis import redis_client
 from app.core.config import settings
-from app.core.redis import QUEUE_ANALYSIS, redis_client
-from app.db.database import AsyncSessionLocal
-from app.repositories.job_repo import AnalysisJobRepo
 
 logger = logging.getLogger(__name__)
 
-CHANNEL_TRANSCRIPTION_COMPLETED = "event:transcription.completed"
+CHANNEL_AUTO_RESOLVE_COMPLETED = "event:auto_resolve.completed"
 
 
 async def start_subscriber():
     pubsub = redis_client.pubsub()
-    await pubsub.subscribe(CHANNEL_TRANSCRIPTION_COMPLETED)
-    logger.info("Subscribed to: %s", CHANNEL_TRANSCRIPTION_COMPLETED)
+    await pubsub.subscribe(CHANNEL_AUTO_RESOLVE_COMPLETED)
+    logger.info(f"Subscribed to: {CHANNEL_AUTO_RESOLVE_COMPLETED}")
 
     async for message in pubsub.listen():
         if message["type"] != "message":
@@ -23,39 +20,31 @@ async def start_subscriber():
 
         try:
             payload = json.loads(message["data"])
-            logger.info("Received transcription.completed event: %s", payload)
-            meeting_id = uuid.UUID(payload["meeting_id"])
-            transcript_id = uuid.UUID(payload["transcript_id"])
+            if payload.get("event") != "auto_resolve.completed":
+                continue
 
-            async with AsyncSessionLocal() as db:
-                repo = AnalysisJobRepo(db)
-                existing = await repo.get_by_meeting_and_transcript(
-                    meeting_id=meeting_id,
-                    transcript_id=transcript_id,
-                )
+            logger.info(f"Nhận event auto_resolve.completed: {payload}")
 
-                if existing:
-                    logger.info(
-                        "Analysis job already exists for transcript %s: %s",
-                        payload["transcript_id"],
-                        existing.id,
-                    )
-                    continue
+            meeting_id = payload["meeting_id"]
+            transcript_id = payload["transcript_id"]
+            company_id = payload["company_id"]
 
-                job = await repo.create(
-                    {
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{settings.SELF_BASE_URL}/analysis-jobs/",
+                    json={
                         "meeting_id": meeting_id,
                         "transcript_id": transcript_id,
-                        "model": settings.GROQ_MODEL,
-                    }
+                        "company_id": company_id,
+                    },
                 )
-
-            job_message = {
-                "job_id": str(job.id),
-                "meeting_id": payload["meeting_id"],
-                "transcript_id": payload["transcript_id"],
-            }
-            await redis_client.lpush(QUEUE_ANALYSIS, json.dumps(job_message))
+                if resp.status_code == 409:
+                    logger.info(
+                        f"Analysis job đã tồn tại cho transcript {transcript_id}, bỏ qua"
+                    )
+                else:
+                    resp.raise_for_status()
+                    logger.info(f"Tạo analysis job thành công: {resp.json()}")
 
         except Exception as e:
-            logger.error("Subscriber error: %s", e)
+            logger.error(f"Subscriber error: {e}", exc_info=True)
