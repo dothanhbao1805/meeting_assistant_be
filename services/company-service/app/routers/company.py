@@ -81,7 +81,7 @@ async def trello_authorize(
     if not company.trello_api_key:
         raise HTTPException(status_code=400, detail="Chưa có trello_api_key")
 
-    callback_url = f"{settings.API_BASE_URL}/companies/{company_id}/trello/callback"
+    callback_url = f"http://localhost:5173/trello/callback?companyId={company_id}"
 
     auth_url = (
         f"https://trello.com/1/authorize"
@@ -89,14 +89,13 @@ async def trello_authorize(
         f"&name=MeetingAssistant"
         f"&scope=read,write"
         f"&expiration=never"
-        f"&response_type=token"
-        f"&callback_url={callback_url}"
+        f"&return_url={callback_url}"  # ← đổi response_type=token thành return_url
     )
 
     return {"auth_url": auth_url}
 
 
-@router.get("/{company_id}/trello/callback")
+@router.post("/{company_id}/trello/callback")
 async def trello_callback(
     company_id: str,
     token: str,  # Trello gửi ?token=xxx về đây

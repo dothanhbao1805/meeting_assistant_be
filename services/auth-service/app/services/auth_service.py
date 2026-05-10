@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.schemas.user import UserResponse
 
 from app.core.security import (
     create_access_token,
@@ -13,11 +14,12 @@ from app.schemas.auth import LoginRequest, TokenResponse
 
 
 async def _build_token_response(db: AsyncSession, user_id) -> TokenResponse:
+    user = await user_repo.get_user_by_id(db, user_id)
     access_token = create_access_token({"sub": str(user_id)})
     refresh_token = generate_refresh_token()
     expires_at = refresh_token_expires_at()
     await token_repo.create_refresh_token(db, user_id, refresh_token, expires_at)
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token, user=UserResponse.model_validate(user))
 
 
 async def login(db: AsyncSession, data: LoginRequest) -> TokenResponse:
