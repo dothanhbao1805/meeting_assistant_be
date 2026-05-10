@@ -13,8 +13,10 @@ class AnalysisJobRepo:
         job = AnalysisJob(
             meeting_id=data["meeting_id"],
             transcript_id=data["transcript_id"],
+            company_id=data.get("company_id"),  # thêm
             status="queued",
-            ai_model=data.get("model", "llama-3.3-70b-versatile"),
+            ai_model=data.get("ai_model")
+            or data.get("model", "llama-3.3-70b-versatile"),
             created_at=datetime.now(timezone.utc),
         )
         self.db.add(job)

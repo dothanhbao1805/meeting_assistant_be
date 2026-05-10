@@ -16,38 +16,6 @@ CHANNEL_AUTO_RESOLVE_COMPLETED = "event:auto_resolve.completed"
 logger = logging.getLogger(__name__)
 
 
-async def handle_transcription_completed(event: dict) -> None:
-    transcript_id = UUID(event["transcript_id"])
-    meeting_id = event["meeting_id"]
-    company_id = event["company_id"]
-    meeting_file_id = event["meeting_file_id"]
-
-    logger.info(
-        f"[auto_resolve_worker] Received event for transcript={transcript_id}, "
-        f"meeting={meeting_id}"
-    )
-
-    async with AsyncSessionLocal() as db:
-        try:
-            result = await auto_resolve_speakers(
-                db=db,
-                transcript_id=transcript_id,
-                meeting_id=meeting_id,
-                company_id=company_id,
-                meeting_file_id=meeting_file_id,
-                token="",  # internal call — bypass auth
-            )
-            logger.info(
-                f"[auto_resolve_worker] Done for transcript={transcript_id}: {result}"
-            )
-        except Exception as e:
-            logger.error(
-                f"[auto_resolve_worker] Failed for transcript={transcript_id}: {e}",
-                exc_info=True,
-            )
-            # Không raise — worker tiếp tục chạy, không crash
-
-
 async def run_worker() -> None:
     logger.info(
         f"[auto_resolve_worker] Started — subscribing to: {CHANNEL_TRANSCRIPTION_COMPLETED}"
@@ -80,7 +48,7 @@ async def handle_transcription_completed(event: dict) -> None:
     transcript_id = UUID(event["transcript_id"])
     meeting_id = event["meeting_id"]
     company_id = event["company_id"]
-    meeting_file_id = event["meeting_file_id"]
+    meeting_file_id = event.get("meeting_file_id")
 
     logger.info(f"[auto_resolve_worker] Starting for transcript={transcript_id}")
 

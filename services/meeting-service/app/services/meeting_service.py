@@ -150,6 +150,7 @@ class MeetingService:
                 "media_file_id": str(media_file.id),
                 "signed_url": public_url,
                 "language_code": data.language_code or "vi",
+                "company_id": str(data.company_id),
             }
             await redis_client.lpush(QUEUE_TRANSCRIPTION, json.dumps(message))
             logger.info(f"Pushed transcription job to queue: meeting_id={meeting.id}")
@@ -163,7 +164,6 @@ class MeetingService:
             )
 
         return created_meeting
-
 
     async def get_meeting(self, meeting_id: uuid.UUID) -> Meeting:
         meeting = await self.repo.get_by_id(meeting_id)

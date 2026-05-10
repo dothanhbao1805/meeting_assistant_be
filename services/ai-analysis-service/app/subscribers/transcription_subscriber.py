@@ -27,6 +27,7 @@ async def start_subscriber():
 
             meeting_id = payload["meeting_id"]
             transcript_id = payload["transcript_id"]
+            company_id = payload["company_id"]
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(
@@ -34,6 +35,7 @@ async def start_subscriber():
                     json={
                         "meeting_id": meeting_id,
                         "transcript_id": transcript_id,
+                        "company_id": company_id,
                     },
                 )
                 if resp.status_code == 409:
