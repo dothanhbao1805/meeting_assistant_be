@@ -1,12 +1,27 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+import json
+import logging
+from datetime import datetime
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.schemas.utterance import UtteranceResponse, UtteranceUpdateResolved
+from app.schemas.utterance import (
+    UtteranceResponse,
+    UtteranceUpdateResolved,
+    UtteranceUpdateByUser,
+)
 from app.services.utterance_service import UtteranceService
 from app.repositories.utterance_repo import UtteranceRepo
+from app.core.redis import redis_client
+
+
+PENDING_REVIEW_KEY_PREFIX = "pending_review:meeting:"
+CHANNEL_AUTO_RESOLVE_COMPLETED = "event:auto_resolve.completed"
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/utterances", tags=["Utterances"])
 
@@ -57,3 +72,44 @@ async def resolve_speaker(
     return await service.update_resolved_user_id_by_meeting_id_and_speaker_label(
         meeting_id, data
     )
+
+
+@router.patch("/{meeting_id}/confirm-speakers")
+async def confirm_speakers(
+    meeting_id: uuid.UUID,
+    data: List[UtteranceUpdateByUser],
+    service: UtteranceService = Depends(get_utt_service),
+):
+    """User confirm/chỉnh sửa người nói từng câu → trigger ai-analyst pipeline."""
+    result = await service.update_resolved_user_id_by_utterance_ids(meeting_id, data)
+
+    redis_key = f"{PENDING_REVIEW_KEY_PREFIX}{meeting_id}"
+    raw = await redis_client.get(redis_key)
+
+    if raw is None:
+        logger.warning(
+            f"[confirm_speakers] No pending review state found for meeting={meeting_id}, "
+            "skipping ai-analyst publish"
+        )
+        return result
+
+    pending = json.loads(raw)
+    await redis_client.publish(
+        CHANNEL_AUTO_RESOLVE_COMPLETED,
+        json.dumps(
+            {
+                "event": "auto_resolve.completed",
+                "transcript_id": pending["transcript_id"],
+                "meeting_id": pending["meeting_id"],
+                "company_id": pending["company_id"],
+                "meeting_file_id": pending["meeting_file_id"],
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        ),
+    )
+    logger.info(
+        f"[confirm_speakers] Published auto_resolve.completed for meeting={meeting_id}"
+    )
+    await redis_client.delete(redis_key)
+
+    return result

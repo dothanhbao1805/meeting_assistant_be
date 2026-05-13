@@ -6,6 +6,7 @@ from uuid import UUID
 
 # ─── Utterance Schemas ───────────────────────────────────────────────────────
 
+
 class UtteranceResponse(BaseModel):
     id: UUID
     transcript_id: UUID
@@ -46,6 +47,7 @@ class UtteranceResolveSpeakerResponse(BaseModel):
 
 # ─── Transcript Schemas ───────────────────────────────────────────────────────
 
+
 class TranscriptResponse(BaseModel):
     id: UUID
     job_id: UUID
@@ -71,8 +73,13 @@ class MeetingTranscriptResponse(BaseModel):
     job_status: str
     transcript: Optional[TranscriptResponse] = None
     message: Optional[str] = None
-    
+
 
 class UtteranceUpdateResolved(BaseModel):
     speaker_label: str
     resolved_user_id: UUID
+
+
+class UtteranceUpdateByUser(BaseModel):
+    id: UUID
+    resolved_user_id: UUID  # user chọn ai nói câu này
