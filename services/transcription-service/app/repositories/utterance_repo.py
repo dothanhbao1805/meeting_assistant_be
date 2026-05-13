@@ -6,6 +6,7 @@ from app.models.transcript import Transcript
 from sqlalchemy import update, exists
 from typing import List
 
+
 class UtteranceRepo:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -42,7 +43,7 @@ class UtteranceRepo:
             )
             self.db.add(utterance)
             utterances.append(utterance)
-        
+
         await self.db.flush()
         return utterances
 
@@ -53,9 +54,7 @@ class UtteranceRepo:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_transcript_id(
-        self, transcript_id: uuid.UUID
-    ) -> list[Utterance]:
+    async def get_by_transcript_id(self, transcript_id: uuid.UUID) -> list[Utterance]:
         """Lấy tất cả utterance của transcript, sắp xếp theo sequence"""
         result = await self.db.execute(
             select(Utterance)
@@ -113,48 +112,44 @@ class UtteranceRepo:
 
         await self.db.flush()
         return len(utterances)
-    
+
     async def get_resolved_user_id_is_null_by_meeting_id(
         self,
         meeting_id: uuid.UUID,
     ) -> list[Utterance]:
-     stmt = (
-        select(Utterance)
-        .join_from(Utterance, Transcript, Utterance.transcript_id == Transcript.id)
-        .where(
-            Transcript.meeting_id == meeting_id,
-            Utterance.resolved_user_id.is_(None)
+        stmt = (
+            select(Utterance)
+            .join_from(Utterance, Transcript, Utterance.transcript_id == Transcript.id)
+            .where(
+                Transcript.meeting_id == meeting_id,
+                Utterance.resolved_user_id.is_(None),
+            )
+            .order_by(Utterance.sequence_order)
         )
-        .order_by(Utterance.sequence_order)
-     )
-     result = await self.db.execute(stmt)
-    
-     return list(result.scalars().all())
- 
+        result = await self.db.execute(stmt)
+
+        return list(result.scalars().all())
+
     async def get_all_utterances_by_meeting_id(
         self,
         meeting_id: uuid.UUID,
     ) -> list[Utterance]:
         stmt = (
-        select(Utterance)
-        .join(Utterance.transcript)
-        .where(
-            Transcript.meeting_id == meeting_id
-        )
-        .order_by(Utterance.sequence_order)
+            select(Utterance)
+            .join(Utterance.transcript)
+            .where(Transcript.meeting_id == meeting_id)
+            .order_by(Utterance.sequence_order)
         )
 
         result = await self.db.execute(stmt)
         return result.scalars().all()
-    
+
     async def update_resolved_user_id_by_meeting_id_and_speaker_label(
-        self,
-        meeting_id: uuid.UUID,
-        data: List
+        self, meeting_id: uuid.UUID, data: List
     ) -> dict:
 
         subquery = (
-        select(Transcript.id)
+            select(Transcript.id)
             .where(Transcript.meeting_id == meeting_id)
             .scalar_subquery()
         )
@@ -180,15 +175,53 @@ class UtteranceRepo:
         exists_stmt = select(
             exists().where(
                 Utterance.transcript_id.in_(subquery),
-                Utterance.resolved_user_id.is_(None)
+                Utterance.resolved_user_id.is_(None),
             )
         )
 
         result = await self.db.execute(exists_stmt)
         has_unresolved = result.scalar()
 
-        return {
-            "updated_count": updated_speakers,  
-            "all_resolved": not has_unresolved
-    }
+        return {"updated_count": updated_speakers, "all_resolved": not has_unresolved}
 
+    async def update_resolved_user_id_by_utterance_ids(
+        self,
+        meeting_id: uuid.UUID,
+        data: List,
+    ) -> dict:
+        subquery = (
+            select(Transcript.id)
+            .where(Transcript.meeting_id == meeting_id)
+            .scalar_subquery()
+        )
+
+        updated_count = 0
+
+        for item in data:
+            stmt = (
+                update(Utterance)
+                .where(Utterance.id == item.id)
+                .where(
+                    Utterance.transcript_id.in_(subquery)
+                )  # đảm bảo utterance thuộc meeting này
+                .values(resolved_user_id=item.resolved_user_id)
+            )
+            result = await self.db.execute(stmt)
+            if (result.rowcount or 0) > 0:
+                updated_count += 1
+
+        await self.db.commit()
+
+        exists_stmt = select(
+            exists().where(
+                Utterance.transcript_id.in_(subquery),
+                Utterance.resolved_user_id.is_(None),
+            )
+        )
+        result = await self.db.execute(exists_stmt)
+        has_unresolved = result.scalar()
+
+        return {
+            "updated_count": updated_count,
+            "all_resolved": not has_unresolved,
+        }

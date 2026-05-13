@@ -1,5 +1,9 @@
 from app.repositories.utterance_repo import UtteranceRepo
-from app.schemas.utterance import UtteranceResponse, UtteranceUpdateResolved
+from app.schemas.utterance import (
+    UtteranceResponse,
+    UtteranceUpdateByUser,
+    UtteranceUpdateResolved,
+)
 from typing import List
 import uuid
 
@@ -33,3 +37,10 @@ class UtteranceService:
 
     async def get_utterances_by_transcript_id(self, transcript_id: uuid.UUID) -> list:
         return await self.utterance_repository.get_by_transcript_id(transcript_id)
+
+    async def update_resolved_user_id_by_utterance_ids(
+        self, meeting_id: uuid.UUID, data: List[UtteranceUpdateByUser]
+    ):
+        return await self.utterance_repository.update_resolved_user_id_by_utterance_ids(
+            meeting_id, data
+        )
