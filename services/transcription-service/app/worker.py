@@ -50,6 +50,7 @@ async def process_message(message: dict):
             {
                 "meeting_id": message["meeting_id"],
                 "media_file_id": message["media_file_id"],
+                "company_id": message.get("company_id"),
                 "status": "queued",
                 "model": message.get("model", "nova-2"),
                 "options": {

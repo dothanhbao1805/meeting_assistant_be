@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Webhook URL (for Deepgram callback)
     WEBHOOK_URL: str = "https://api-gateway:8000/api/v1/webhooks/deepgram"
+    COMPANY_SERVICE_URL: str = "http://company-service:8003"
 
     # Event Publishing
     REDIS_CHANNEL_TRANSCRIPTION: str = "event:transcription"

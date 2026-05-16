@@ -152,18 +152,14 @@ class TaskService:
     async def save_corrections_to_company(
         self, company_id: str, corrections: list[dict]
     ):
-        logger.info(
-            f"[corrections] Gọi company-service, company_id={company_id}, corrections={corrections}"
-        )
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 url = f"{settings.COMPANY_SERVICE_URL}/internal/corrections"
-                logger.info(f"[corrections] POST {url}")
                 resp = await client.post(
                     url, json={"company_id": company_id, "corrections": corrections}
                 )
                 resp.raise_for_status()
-                logger.info(f"[corrections] Response: {resp.status_code} {resp.text}")
+                logger.info(f"[corrections] Response: {resp.status_code}")
         except Exception as e:
             logger.warning(f"[corrections] Lỗi: {e}")
 
@@ -172,7 +168,6 @@ class TaskService:
         if not old_task:
             raise HTTPException(status_code=404, detail="Task not found")
 
-        # Lưu lại giá trị cũ trước khi update (tránh SQLAlchemy refresh)
         old_title = old_task.title
         old_description = old_task.description or ""
 
@@ -185,21 +180,19 @@ class TaskService:
             corrections = []
 
             if "title" in data and data["title"] != old_title:
-                corrections.extend(
-                    self.extract_word_corrections(old_title, data["title"])
-                )
+                for c in self.extract_word_corrections(old_title, data["title"]):
+                    c["context"] = old_title  # thêm context
+                    corrections.append(c)
 
             if "description" in data and data["description"] != old_description:
-                corrections.extend(
-                    self.extract_word_corrections(
-                        old_description, data["description"] or ""
-                    )
-                )
+                for c in self.extract_word_corrections(
+                    old_description, data["description"] or ""
+                ):
+                    c["context"] = old_description  # thêm context
+                    corrections.append(c)
 
             if corrections:
                 await self.save_corrections_to_company(company_id, corrections)
-                logger.info(
-                    f"Saved {len(corrections)} corrections cho company {company_id}: {corrections}"
-                )
+                logger.info(f"Saved {len(corrections)} corrections: {corrections}")
 
         return task

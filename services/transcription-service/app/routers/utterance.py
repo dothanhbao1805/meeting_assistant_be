@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.schemas.utterance import (
     UtteranceResponse,
+    UtteranceUpdateRequest,
     UtteranceUpdateResolved,
     UtteranceUpdateByUser,
 )
@@ -113,3 +114,16 @@ async def confirm_speakers(
     await redis_client.delete(redis_key)
 
     return result
+
+
+@router.patch(
+    "/utterances/{utterance_id}",
+    response_model=UtteranceResponse,
+    summary="Sửa text của một utterance cụ thể",
+)
+async def update_utterance(
+    utterance_id: uuid.UUID,
+    payload: UtteranceUpdateRequest,
+    service: UtteranceService = Depends(get_utt_service),
+) -> UtteranceResponse:
+    return await service.update_utterance(utterance_id, payload)

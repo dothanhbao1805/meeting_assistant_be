@@ -33,7 +33,7 @@ async def create_analysis_job(
         {
             "meeting_id": payload.meeting_id,
             "transcript_id": payload.transcript_id,
-            "company_id": payload.company_id,  # thêm
+            "company_id": payload.company_id,
             "ai_model": payload.model or settings.GROQ_MODEL,
         }
     )

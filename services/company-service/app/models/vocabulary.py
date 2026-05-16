@@ -1,3 +1,4 @@
+from typing import Optional
 import uuid
 from datetime import datetime
 
@@ -6,6 +7,7 @@ from sqlalchemy import (
     Integer,
     ForeignKey,
     DateTime,
+    Text,
     func,
 )
 
@@ -29,6 +31,8 @@ class TranscriptionCorrection(Base):
     wrong_text: Mapped[str] = mapped_column(String(500), nullable=False)
 
     correct_text: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    context: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     frequency: Mapped[int] = mapped_column(Integer, default=1)
 
