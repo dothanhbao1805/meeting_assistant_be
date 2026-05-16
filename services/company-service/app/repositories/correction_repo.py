@@ -9,8 +9,8 @@ async def upsert_correction(
     company_id: uuid.UUID,
     wrong_text: str,
     correct_text: str,
+    context: str = None,  # thêm
 ) -> TranscriptionCorrection:
-    # Kiểm tra đã tồn tại chưa
     result = await db.execute(
         select(TranscriptionCorrection).where(
             TranscriptionCorrection.company_id == company_id,
@@ -20,17 +20,18 @@ async def upsert_correction(
     existing = result.scalar_one_or_none()
 
     if existing:
-        # Cập nhật correct_text mới nhất và tăng frequency
         existing.correct_text = correct_text.lower()
         existing.frequency += 1
+        if context:
+            existing.context = context
         await db.flush()
         return existing
 
-    # Tạo mới
     correction = TranscriptionCorrection(
         company_id=company_id,
         wrong_text=wrong_text.lower(),
         correct_text=correct_text.lower(),
+        context=context.lower() if context else None,
         frequency=1,
     )
     db.add(correction)

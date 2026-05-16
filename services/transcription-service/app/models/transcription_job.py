@@ -21,5 +21,6 @@ class TranscriptionJob(Base):
     processing_ms = Column(Integer, nullable=True)
     started_at = Column(TIMESTAMP(timezone=True), nullable=True)
     completed_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    company_id = Column(UUID(as_uuid=True), nullable=True)
 
     transcripts = relationship("Transcript", back_populates="job")

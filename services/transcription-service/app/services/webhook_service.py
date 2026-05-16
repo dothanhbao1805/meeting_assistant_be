@@ -6,6 +6,7 @@ import logging
 import uuid
 from datetime import datetime
 
+import re
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -106,21 +107,14 @@ class WebhookService:
             logger.error(f"Signature verification error: {e}")
             return False
 
-    async def process_webhook(
-        self,
-        payload: DeepgramWebhookPayload,
-    ) -> dict:
+    async def process_webhook(self, payload: DeepgramWebhookPayload) -> dict:
         try:
             request_id = payload.request_id
-            logger.info(f"Processing webhook for request_id: {request_id}")
-
             job = await self._find_job_by_deepgram_id(request_id)
             if not job:
-                logger.error(f"Job not found for request_id: {request_id}")
                 raise ValueError(f"Job not found for request_id: {request_id}")
 
             if job.status == "done":
-                logger.info(f"Job {job.id} already done, skipping")
                 return {"received": True, "idempotent": True}
 
             transcript_data = self._parse_deepgram_response(payload)
@@ -143,7 +137,6 @@ class WebhookService:
                 }
             )
 
-            utterances_data = transcript_data["utterances"]
             created_utterances = await self.utterance_repo.create_batch(
                 [
                     {
@@ -156,7 +149,7 @@ class WebhookService:
                         "sequence_order": i,
                         "resolved_user_id": None,
                     }
-                    for i, u in enumerate(utterances_data)
+                    for i, u in enumerate(transcript_data["utterances"])
                 ]
             )
 
@@ -164,25 +157,11 @@ class WebhookService:
             job.deepgram_request_id = request_id
             job.completed_at = datetime.utcnow()
             job.processing_ms = transcript_data.get("processing_ms")
-
             await self.db.commit()
-            logger.info(
-                f"Job {job.id} updated to done, created "
-                f"{len(created_utterances)} utterances"
-            )
 
-            try:
-                async with httpx.AsyncClient(timeout=5) as client:
-                    resp = await client.get(
-                        f"{settings.MEETING_SERVICE_URL}/internal/meetings/{str(job.meeting_id)}"
-                    )
-                    meeting_data = resp.json()
-                    company_id = meeting_data.get("company_id")
-            except Exception as e:
-                logger.warning(f"Không lấy được company_id: {e}")
-                company_id = None
+            # Dùng company_id từ job — không cần gọi meeting-service
+            company_id = str(job.company_id) if job.company_id else None
 
-            # Apply corrections nếu có company_id
             if company_id:
                 created_utterances = await self._apply_corrections(
                     created_utterances, company_id
@@ -190,16 +169,7 @@ class WebhookService:
                 await self.db.commit()
 
             await self._publish_transcription_completed_event(
-                job.id,
-                job.meeting_id,
-                transcript.id,
-                company_id=company_id,  # thêm
-            )
-
-            await self._publish_transcription_completed_event(
-                job.id,
-                job.meeting_id,
-                transcript.id,
+                job.id, job.meeting_id, transcript.id, company_id=company_id
             )
 
             return {
@@ -365,11 +335,52 @@ class WebhookService:
             return utterances
 
         for utterance in utterances:
+            original_text = utterance.text
+            lower_text = utterance.text.lower()
+
             for correction in corrections:
-                wrong = correction["wrong_text"]
+                wrong = correction["wrong_text"].lower()
                 correct = correction["correct_text"]
-                if wrong in utterance.text.lower():
-                    utterance.text = utterance.text.lower().replace(wrong, correct)
-                    logger.info(f"Applied correction: '{wrong}' → '{correct}'")
+                context = correction.get("context", "").lower()
+
+                if wrong not in lower_text:
+                    continue
+
+                if context:
+                    # Lấy các từ context xung quanh wrong_text
+                    context_words = set(context.split()) - {wrong}
+                    utterance_words = set(lower_text.split())
+
+                    # Chỉ replace nếu có ít nhất 2 từ context trùng khớp
+                    overlap = context_words & utterance_words
+                    if len(overlap) >= 2:
+                        utterance.text = re.sub(
+                            re.escape(wrong),
+                            correct,
+                            utterance.text,
+                            flags=re.IGNORECASE,
+                        )
+                        lower_text = utterance.text.lower()
+                        logger.info(
+                            f"Applied correction (context match {len(overlap)} words): "
+                            f"'{wrong}' → '{correct}'"
+                        )
+                    else:
+                        logger.debug(
+                            f"Skipped correction '{wrong}' → '{correct}': "
+                            f"context overlap only {len(overlap)} words"
+                        )
+                else:
+                    # Không có context → apply bình thường
+                    utterance.text = re.sub(
+                        re.escape(wrong),
+                        correct,
+                        utterance.text,
+                        flags=re.IGNORECASE,
+                    )
+                    lower_text = utterance.text.lower()
+                    logger.info(
+                        f"Applied correction (no context): '{wrong}' → '{correct}'"
+                    )
 
         return utterances

@@ -5,6 +5,7 @@ from app.models.utterance import Utterance
 from app.models.transcript import Transcript
 from sqlalchemy import update, exists
 from typing import List
+from app.models.transcription_job import TranscriptionJob
 
 
 class UtteranceRepo:
@@ -225,3 +226,13 @@ class UtteranceRepo:
             "updated_count": updated_count,
             "all_resolved": not has_unresolved,
         }
+
+    async def get_company_id_by_utterance(self, utterance_id: uuid.UUID) -> str | None:
+        result = await self.db.execute(
+            select(TranscriptionJob.company_id)
+            .join(Transcript, Transcript.job_id == TranscriptionJob.id)
+            .join(Utterance, Utterance.transcript_id == Transcript.id)
+            .where(Utterance.id == utterance_id)
+        )
+        company_id = result.scalar_one_or_none()
+        return str(company_id) if company_id else None

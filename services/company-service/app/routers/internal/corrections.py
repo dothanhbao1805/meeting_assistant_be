@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from uuid import UUID
@@ -11,6 +13,7 @@ router = APIRouter(prefix="/internal/corrections", tags=["internal"])
 class CorrectionItem(BaseModel):
     wrong_text: str
     correct_text: str
+    context: Optional[str] = None
 
 
 class SaveCorrectionsRequest(BaseModel):
@@ -22,6 +25,7 @@ class CorrectionResponse(BaseModel):
     id: UUID
     wrong_text: str
     correct_text: str
+    context: Optional[str] = None
     frequency: int
 
     class Config:
@@ -33,7 +37,6 @@ async def save_corrections(
     body: SaveCorrectionsRequest,
     db: AsyncSession = Depends(get_company_db),
 ):
-    """ai-analysis-service gọi để lưu corrections khi user sửa task"""
     saved = []
     for item in body.corrections:
         correction = await correction_repo.upsert_correction(
@@ -41,6 +44,7 @@ async def save_corrections(
             company_id=body.company_id,
             wrong_text=item.wrong_text,
             correct_text=item.correct_text,
+            context=item.context,  # thêm
         )
         saved.append(correction)
     await db.commit()
