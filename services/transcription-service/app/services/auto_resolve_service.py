@@ -107,16 +107,39 @@ async def _fetch_members_with_embeddings(
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             request_url,
-            params={"company_id": company_id},
+            params={"company_id": company_id, "page_size": 1000},
             headers={"Authorization": token},
             timeout=10,
         )
         resp.raise_for_status()
 
+    data = resp.json()
+    if isinstance(data, dict):
+        members = data.get("items", [])
+    elif isinstance(data, list):
+        members = data
+    else:
+        logger.warning(
+            "Unexpected company members response",
+            extra={"company_id": company_id, "response_type": type(data).__name__},
+        )
+        members = []
+
     member_map: Dict[str, dict] = {}
-    for m in resp.json():
-        if m.get("voice_embedding"):
-            member_map[m["id"]] = m
+    for m in members:
+        if not isinstance(m, dict):
+            logger.warning(
+                "Skipping invalid company member item",
+                extra={"company_id": company_id, "item_type": type(m).__name__},
+            )
+            continue
+
+        if m.get("voice_embedding") and m.get("id"):
+            member_map[str(m["id"])] = m
+
+            account_id = m.get("account_id")
+            if account_id:
+                member_map[str(account_id)] = m
     logger.info(
         "Company members with embeddings",
         extra={"company_id": company_id, "member_count": len(member_map)},

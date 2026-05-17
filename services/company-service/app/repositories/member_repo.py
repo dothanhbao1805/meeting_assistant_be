@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 from app.models.member import Member
 import logging
 
@@ -16,9 +16,42 @@ async def get_member_by_id(db: AsyncSession, member_id: str) -> Member | None:
     return member
 
 
-async def get_all_members(db: AsyncSession) -> list[Member]:
-    result = await db.execute(select(Member))
-    return result.scalars().all()
+async def get_all_members(
+    db: AsyncSession,
+    company_id: uuid.UUID | None = None,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+    role: str | None = None,
+) -> dict:
+    query = select(Member)
+
+    if company_id:
+        query = query.where(Member.company_id == company_id)
+    if search:
+        query = query.where(
+            or_(
+                Member.full_name.ilike(f"%{search}%"),
+                Member.google_email.ilike(f"%{search}%"),
+            )
+        )
+    if role:
+        query = query.where(Member.role == role)
+
+    # Đếm total
+    total = await db.scalar(select(func.count()).select_from(query.subquery()))
+
+    # Phân trang
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    members = result.scalars().all()
+
+    return {
+        "items": members,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 async def create_member(db: AsyncSession, data: dict) -> Member:

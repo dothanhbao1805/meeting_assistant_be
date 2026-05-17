@@ -32,7 +32,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.drop_table('company_vocabularies')
+    op.execute("DROP TABLE IF EXISTS company_vocabularies")
     # ### end Alembic commands ###
 
 

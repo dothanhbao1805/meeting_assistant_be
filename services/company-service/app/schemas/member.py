@@ -21,7 +21,6 @@ class MemberUpdate(BaseModel):
     trello_user_id: Optional[str] = None
     trello_username: Optional[str] = None
     google_email: Optional[str] = None
-    voice_embedding: Optional[List[float]] = None
 
 
 class MemberResponse(BaseModel):
@@ -38,3 +37,9 @@ class MemberResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class MemberListResponse(BaseModel):
+    items: List[MemberResponse]
+    total: int
+    page: int
+    page_size: int
