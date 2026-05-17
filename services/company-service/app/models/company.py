@@ -29,6 +29,11 @@ class Company(Base):
     trello_token: Mapped[Optional[str]] = mapped_column(Text)
     trello_api_key: Mapped[Optional[str]] = mapped_column(Text)
     trello_workspace_id: Mapped[Optional[str]] = mapped_column(String(100))
+    # TODO: encrypt OAuth tokens at rest when a project-wide encryption utility is available.
+    google_access_token: Mapped[Optional[str]] = mapped_column(Text)
+    google_refresh_token: Mapped[Optional[str]] = mapped_column(Text)
+    google_token_expiry: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    google_calendar_id: Mapped[Optional[str]] = mapped_column(String)
 
     owner_account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
 

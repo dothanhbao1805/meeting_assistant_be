@@ -13,6 +13,7 @@ class MemberInternal(BaseModel):
     id: UUID
     full_name: str
     email: Optional[str] = None
+    google_email: Optional[str] = None
     account_id: Optional[UUID] = None
 
     class Config:

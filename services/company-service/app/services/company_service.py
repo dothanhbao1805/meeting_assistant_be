@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import HTTPException, status, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cloudinary import CloudinaryClient
@@ -71,6 +73,14 @@ async def update_company(
     return await company_repo.update_company(db, company_id, update_data)
 
 
+async def update_trello_key(db: AsyncSession, company_id: str, trello_api_key: str, trello_workspace_id: str):
+    company = await company_repo.get_company_by_id(db, company_id)
+
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    await company_repo.update_trello_key(db, company_id, trello_api_key, trello_workspace_id)
+
 async def delete_company(db: AsyncSession, company_id: str) -> None:
     company = await company_repo.get_company_by_id(db, company_id)
 
@@ -89,3 +99,7 @@ async def save_trello_token(db: AsyncSession, company_id: str, token: str):
         raise HTTPException(status_code=404, detail="Company not found")
 
     return await company_repo.update_company(db, company_id, {"trello_token": token})
+
+
+async def get_company_by_owner(db: AsyncSession, account_id: UUID):
+    return await company_repo.get_company_by_owner(db, account_id)

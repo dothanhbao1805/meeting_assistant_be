@@ -10,8 +10,8 @@ class CompanyCreate(BaseModel):
     trello_token: Optional[str] = None
     trello_api_key: Optional[str] = None
     trello_workspace_id: Optional[str] = None
+    google_calendar_id: Optional[str] = None
     owner_account_id: UUID
-    industry_code: Optional[str] = None
 
 
 class CompanyUpdate(BaseModel):
@@ -20,8 +20,12 @@ class CompanyUpdate(BaseModel):
     trello_token: Optional[str] = None
     trello_api_key: Optional[str] = None
     trello_workspace_id: Optional[str] = None
+    google_calendar_id: Optional[str] = None
     status: Optional[str] = None
 
+class TrelloKeyUpdate(BaseModel):
+    trello_api_key: str
+    trello_workspace_id: str
 
 class CompanyResponse(BaseModel):
     id: UUID
@@ -31,6 +35,7 @@ class CompanyResponse(BaseModel):
     trello_api_key: Optional[str]
     trello_token: Optional[str]
     trello_workspace_id: Optional[str]
+    google_calendar_id: Optional[str]
     owner_account_id: UUID
     status: str
     created_at: datetime
