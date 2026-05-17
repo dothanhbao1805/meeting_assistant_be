@@ -46,3 +46,11 @@ class MeetingRepository:
             )
         )
         return result.scalars().all()
+
+    async def update_status(self, meeting_id: uuid.UUID, status: str) -> Meeting | None:
+        meeting = await self.get_by_id(meeting_id)
+        if meeting:
+            meeting.status = status
+            await self.db.commit()
+            await self.db.refresh(meeting)
+        return meeting

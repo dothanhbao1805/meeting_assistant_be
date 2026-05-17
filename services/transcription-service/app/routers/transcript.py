@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/v1", tags=["Transcripts"])
 
 
 @router.get(
-    "/meetings/{meeting_id}/transcript",
+    "/transcripts/meetings/{meeting_id}/transcript",
     response_model=MeetingTranscriptResponse,
     summary="Lấy transcript theo meeting",
     responses={

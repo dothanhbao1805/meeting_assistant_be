@@ -14,3 +14,14 @@ async def get_meeting_internal(
 ):
     service = MeetingService(db)
     return await service.get_meeting(uuid.UUID(meeting_id))
+
+from app.schemas.meeting import MeetingStatusUpdate
+
+@router.patch("/{meeting_id}/status")
+async def update_meeting_status_internal(
+    meeting_id: str,
+    data: MeetingStatusUpdate,
+    db: AsyncSession = Depends(get_meeting_db),
+):
+    service = MeetingService(db)
+    return await service.update_meeting_status(uuid.UUID(meeting_id), data.status)

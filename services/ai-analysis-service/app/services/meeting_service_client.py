@@ -9,25 +9,6 @@ class MeetingServiceClient:
     def __init__(self):
         self.base_url = settings.MEETING_SERVICE_URL.rstrip("/")
 
-    async def get_meeting(self, meeting_id: str) -> dict:
-        url = f"{self.base_url}/internal/meetings/{meeting_id}"
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(url)
-                response.raise_for_status()
-                return response.json()
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                f"Meeting service returned {e.response.status_code} "
-                f"for meeting_id={meeting_id}"
-            )
-            raise
-        except Exception as e:
-            logger.error(
-                f"Failed to call meeting service for meeting_id={meeting_id}: {e}"
-            )
-            raise
-
     async def update_meeting_status(self, meeting_id: str, status: str) -> dict:
         url = f"{self.base_url}/internal/meetings/{meeting_id}/status"
         try:
@@ -39,7 +20,6 @@ class MeetingServiceClient:
             logger.error(
                 f"Failed to update meeting status to {status} for meeting_id={meeting_id}: {e}"
             )
-            # Không raise lỗi ở đây để tránh crash tiến trình chính nếu update status thất bại
             return {}
 
 meeting_service_client = MeetingServiceClient()

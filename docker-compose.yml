@@ -207,10 +207,10 @@ services:
       - "8004:8004"
     env_file:
       - ./services/transcription-service/.env
+    dns:
+      - 8.8.8.8
     environment:
       TRANSCRIPTION_DATABASE_URL: postgresql+asyncpg://trans_user:trans_pass@db_transcription:5432/transcription_db
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       MEETING_SERVICE_URL: http://meeting-service:8005/api/v1
       COMPANY_SERVICE_URL: http://company-service:8003/api/v1
       SPEAKER_SIMILARITY_THRESHOLD: "0.5"
@@ -245,6 +245,8 @@ services:
         condition: service_healthy
     networks:
       - meeting_network
+    volumes:
+      - ./services/meeting-service:/app
 
   # ─── AI Analysis Service ────────────────────
   ai-analysis-service:
@@ -254,6 +256,8 @@ services:
     container_name: ai-analysis-service
     env_file:
       - ./services/ai-analysis-service/.env 
+    dns:
+      - 8.8.8.8
     ports:
       - "8006:8006"
     environment:
@@ -269,6 +273,8 @@ services:
         condition: service_healthy
     networks:
       - meeting_network
+    volumes:
+      - ./services/ai-analysis-service:/app
 
  # ─── Integration Service ────────────────────
   integration-service:
