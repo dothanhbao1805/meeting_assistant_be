@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     CLOUDINARY_SECURE: bool = True
     HF_TOKEN: str
     API_BASE_URL: str = "http://company-service:8003/api/v1"
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:5173/google/callback"
 
     class Config:
         env_file = ".env"

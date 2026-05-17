@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.routers import sync, trello
+from app.routers import calendar, sync, trello
 from app.workers.integration_worker import run_worker
 
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +33,7 @@ app = FastAPI(
 )
 
 app.include_router(trello.router, prefix="/api/v1")
+app.include_router(calendar.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
 
 

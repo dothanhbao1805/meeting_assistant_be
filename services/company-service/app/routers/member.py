@@ -4,11 +4,17 @@ from typing import Annotated, List, Optional
 from uuid import UUID
 
 from app.db.database import get_company_db
-from app.schemas.member import MemberUpdate, MemberResponse
+from app.schemas.member import MemberListResponse, MemberUpdate, MemberResponse
 from app.services import member_service
 
 router = APIRouter(prefix="/members", tags=["members"])
 
+ALLOWED_AUDIO_TYPES = {
+    "audio/mpeg",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/mp4",
+}
 
 @router.post(
     "",
@@ -32,18 +38,7 @@ async def create_member(
     db: AsyncSession = Depends(get_company_db),
 ):
     try:
-        print("🚀 START create_member")
-
-        # ===== DEBUG INPUT =====
-        print("👉 company_id:", company_id)
-        print("👉 account_id:", account_id)
-        print("👉 full_name:", full_name)
-        print("👉 role:", role)
-
-        # ===== HANDLE FILE =====
         raw_files = [f for f in [voice_file_1, voice_file_2, voice_file_3] if f is not None]
-
-        print(f"👉 Number of files received: {len(raw_files)}")
 
         audio_bytes_list = None
 
@@ -51,14 +46,10 @@ async def create_member(
             audio_bytes_list = []
             for i, f in enumerate(raw_files):
                 content = await f.read()
-                print(f"👉 File {i+1}: name={f.filename}, size={len(content)} bytes")
-
                 if len(content) == 0:
                     raise HTTPException(status_code=400, detail=f"File {f.filename} is empty")
 
                 audio_bytes_list.append(content)
-
-        print("👉 Calling member_service.create_member...")
 
         result = await member_service.create_member(
             db=db,
@@ -71,8 +62,6 @@ async def create_member(
             google_email=google_email,
             audio_bytes_list=audio_bytes_list,
         )
-
-        print("✅ SUCCESS create_member")
 
         return result
 
@@ -92,9 +81,20 @@ async def create_member(
         )
 
 
-@router.get("", response_model=list[MemberResponse])
-async def get_all_members(db: AsyncSession = Depends(get_company_db)):
-    return await member_service.get_all_members(db)
+@router.get("", response_model=MemberListResponse)
+async def get_all_members(
+    db: AsyncSession = Depends(get_company_db),
+    company_id: UUID | None = None,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+    role: str | None = None,
+):
+    return await member_service.get_all_members(
+        db, company_id=company_id,
+        page=page, page_size=page_size,
+        search=search, role=role,
+    )
 
 
 @router.get("/{member_id}", response_model=MemberResponse)
@@ -113,10 +113,95 @@ async def get_member_by_account_id(account_id: UUID, db: AsyncSession = Depends(
 @router.put("/{member_id}", response_model=MemberResponse)
 async def update_member(
     member_id: str,
-    data: MemberUpdate,
+
+    full_name: Optional[str] = Form(None),
+    role: Optional[str] = Form(None),
+    google_email: Optional[str] = Form(None),
+    trello_user_id: Optional[str] = Form(None),
+    trello_username: Optional[str] = Form(None),
+
+    voice_file_1: Optional[UploadFile] = File(None),
+    voice_file_2: Optional[UploadFile] = File(None),
+    voice_file_3: Optional[UploadFile] = File(None),
+
     db: AsyncSession = Depends(get_company_db),
 ):
-    return await member_service.update_member(db, member_id, data)
+    try:
+        # Tạo object update data
+        data = MemberUpdate(
+            full_name=full_name,
+            role=role,
+            google_email=google_email,
+            trello_user_id=trello_user_id,
+            trello_username=trello_username,
+        )
+
+        # Lọc file không null
+        raw_files = [
+            f for f in [
+                voice_file_1,
+                voice_file_2,
+                voice_file_3,
+            ]
+            if f is not None
+        ]
+
+        audio_bytes_list: list[bytes] | None = None
+
+        if raw_files:
+            ALLOWED_AUDIO_TYPES = {
+                "audio/mpeg",
+                "audio/wav",
+                "audio/x-wav",
+                "audio/mp4",
+                "audio/webm",
+            }
+
+            audio_bytes_list = []
+
+            for f in raw_files:
+
+                # Validate mime type
+                if f.content_type not in ALLOWED_AUDIO_TYPES:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Unsupported audio type: {f.content_type}"
+                    )
+
+                content = await f.read()
+
+                # Validate empty file
+                if len(content) == 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"File {f.filename} is empty"
+                    )
+
+                audio_bytes_list.append(content)
+
+        result = await member_service.update_member(
+            db=db,
+            member_id=member_id,
+            data=data,
+            audio_bytes_list=audio_bytes_list,
+        )
+
+        return result
+
+    except HTTPException as e:
+        print("❌ HTTP ERROR:", e.detail)
+        raise e
+
+    except Exception as e:
+        import traceback
+
+        print("🔥 UNEXPECTED ERROR:")
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal error: {str(e)}"
+        )
 
 @router.delete("/{member_id}", status_code=204)
 async def delete_member(member_id: str, db: AsyncSession = Depends(get_company_db)):
