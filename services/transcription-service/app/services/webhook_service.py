@@ -172,6 +172,9 @@ class WebhookService:
                 job.id, job.meeting_id, transcript.id, company_id=company_id
             )
 
+            from app.services.meeting_service_client import meeting_service_client
+            await meeting_service_client.update_meeting_status(str(job.meeting_id), "analyzing")
+
             return {
                 "received": True,
                 "job_id": str(job.id),

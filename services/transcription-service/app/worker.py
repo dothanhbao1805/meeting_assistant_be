@@ -72,6 +72,10 @@ async def process_message(message: dict):
             job.status = "failed"
             job.error_message = error_msg
             await db.commit()
+            
+            from app.services.meeting_service_client import meeting_service_client
+            await meeting_service_client.update_meeting_status(str(job.meeting_id), "failed")
+            
             return
 
         # call Deepgram API
@@ -90,6 +94,9 @@ async def process_message(message: dict):
             job.started_at = datetime.utcnow()
             await db.commit()
 
+            from app.services.meeting_service_client import meeting_service_client
+            await meeting_service_client.update_meeting_status(str(job.meeting_id), "transcribing")
+
             logger.info(
                 f"Job {job.id} sent to Deepgram — "
                 f"deepgram_request_id: {job.deepgram_request_id}"
@@ -101,6 +108,9 @@ async def process_message(message: dict):
             job.error_message = str(e)
             job.completed_at = datetime.utcnow()
             await db.commit()
+
+            from app.services.meeting_service_client import meeting_service_client
+            await meeting_service_client.update_meeting_status(str(job.meeting_id), "failed")
 
 
 async def run_worker():

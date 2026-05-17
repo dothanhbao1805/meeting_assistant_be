@@ -173,3 +173,9 @@ class MeetingService:
 
     async def get_meetings_by_company(self, company_id: uuid.UUID) -> list[Meeting]:
         return await self.repo.get_by_company(company_id)
+
+    async def update_meeting_status(self, meeting_id: uuid.UUID, status: str) -> Meeting:
+        meeting = await self.repo.update_status(meeting_id, status)
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Meeting không tồn tại")
+        return meeting

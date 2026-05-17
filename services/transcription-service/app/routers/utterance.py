@@ -88,13 +88,26 @@ async def confirm_speakers(
     raw = await redis_client.get(redis_key)
 
     if raw is None:
-        logger.warning(
-            f"[confirm_speakers] No pending review state found for meeting={meeting_id}, "
-            "skipping ai-analyst publish"
-        )
-        return result
-
-    pending = json.loads(raw)
+        logger.info(f"[confirm_speakers] No pending review state in Redis for meeting={meeting_id}, querying DB...")
+        from app.repositories.transcript_repo import get_latest_done_job_with_transcript
+        job_and_transcript = await get_latest_done_job_with_transcript(service.utterance_repository.db, meeting_id)
+        if job_and_transcript:
+            job, transcript = job_and_transcript
+            if transcript:
+                pending = {
+                    "transcript_id": str(transcript.id),
+                    "meeting_id": str(meeting_id),
+                    "company_id": str(job.company_id),
+                    "meeting_file_id": str(job.media_file_id),
+                }
+            else:
+                logger.warning(f"[confirm_speakers] Job found but transcript is missing for meeting={meeting_id}")
+                return result
+        else:
+            logger.warning(f"[confirm_speakers] No done job found in DB for meeting={meeting_id}")
+            return result
+    else:
+        pending = json.loads(raw)
     await redis_client.publish(
         CHANNEL_AUTO_RESOLVE_COMPLETED,
         json.dumps(

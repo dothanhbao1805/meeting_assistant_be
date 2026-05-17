@@ -136,6 +136,9 @@ async def process_message(message: dict):
                 completed_at=datetime.now(timezone.utc),
             )
 
+            from app.services.meeting_service_client import meeting_service_client
+            await meeting_service_client.update_meeting_status(str(job.meeting_id), "completed")
+
             mapped = sum(1 for t in tasks_data if t.get("resolved_user_id"))
             await publish_analysis_completed(
                 analysis_job_id=job.id,
@@ -156,6 +159,9 @@ async def process_message(message: dict):
         except Exception as e:
             logger.error(f"Job {job.id} thất bại: {e}")
             await job_repo.update(job, status="failed", error_message=str(e))
+            
+            from app.services.meeting_service_client import meeting_service_client
+            await meeting_service_client.update_meeting_status(str(job.meeting_id), "failed")
 
 
 async def run_worker():

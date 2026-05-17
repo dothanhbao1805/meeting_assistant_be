@@ -18,24 +18,37 @@ app.add_middleware(
 
 SERVICES = {
     "auth": "http://auth-service:8001",
+    "users": "http://auth-service:8001",
     "ai": "http://ai-service:8002",
     "meeting": "http://meeting-service:8005",
+    "meetings": "http://meeting-service:8005",
     "company": "http://company-service:8003",
+    "companies": "http://company-service:8003",
+    "members": "http://company-service:8003",
     "transcription": "http://transcription-service:8004",
+    "transcripts": "http://transcription-service:8004",
+    "utterances": "http://transcription-service:8004",
+    "analysis": "http://ai-analysis-service:8006",
 }
 
 
 @app.api_route(
+    "/api/v1/{service}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
+)
+@app.api_route(
     "/api/v1/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
 )
-async def gateway(service: str, path: str, request: Request):
+async def gateway(service: str, request: Request, path: str = ""):
     target_host = SERVICES.get(service)
     if not target_host:
         return Response(content=f"Service '{service}' not found", status_code=404)
 
-    url = f"{target_host}/api/v1/{service}/{path}"
+    req_path = request.url.path
+    if service == "analysis":
+        req_path = req_path.replace("/api/v1/analysis", "/api/v1")
+    url = f"{target_host}{req_path}"
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         try:
             resp = await client.request(
                 method=request.method,
